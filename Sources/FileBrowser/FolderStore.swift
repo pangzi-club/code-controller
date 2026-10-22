@@ -15,7 +15,7 @@ final class FolderStore: ObservableObject {
         didSet { UserDefaults.standard.set(folders.map(\.url.path), forKey: Self.storageKey) }
     }
 
-    private static let storageKey = "FileBrowser.folderPaths"
+    private static let storageKey = "folderPaths"
 
     init() {
         let paths = UserDefaults.standard.stringArray(forKey: Self.storageKey) ?? []

@@ -1,38 +1,55 @@
 import SwiftUI
 
+/// What the detail pane currently shows: a sidebar folder or the settings page.
+enum SidebarSelection: Hashable {
+    case folder(UUID)
+    case settings
+}
+
 struct ContentView: View {
     @StateObject private var store = FolderStore()
-    @State private var selectedFolderID: UUID?
+    @State private var selection: SidebarSelection?
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(store: store, selection: $selectedFolderID)
+            SidebarView(store: store, selection: $selection)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             detailContent
         }
         .onAppear {
-            if selectedFolderID == nil {
-                selectedFolderID = store.folders.first?.id
+            if selection == nil {
+                selection = store.folders.first.map { .folder($0.id) }
             }
         }
     }
 
     @ViewBuilder
     private var detailContent: some View {
-        if let folder = store.folders.first(where: { $0.id == selectedFolderID }) {
-            FileListView(folder: folder)
-                .id(folder.id)
-        } else {
-            PlaceholderView(hasFolders: !store.folders.isEmpty) {
-                addFolderAndSelect()
+        switch selection {
+        case .settings:
+            SettingsView()
+        case .folder(let id):
+            if let folder = store.folders.first(where: { $0.id == id }) {
+                FileListView(folder: folder)
+                    .id(folder.id)
+            } else {
+                placeholder
             }
+        case nil:
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
+        PlaceholderView(hasFolders: !store.folders.isEmpty) {
+            addFolderAndSelect()
         }
     }
 
     private func addFolderAndSelect() {
         if let url = FolderPicker.chooseFolder(), let folder = store.add(url) {
-            selectedFolderID = folder.id
+            selection = .folder(folder.id)
         }
     }
 }
@@ -72,11 +89,17 @@ private struct PlaceholderView: View {
 
 private struct SidebarView: View {
     @ObservedObject var store: FolderStore
-    @Binding var selection: UUID?
+    @Binding var selection: SidebarSelection?
 
     @State private var hoveredFolderID: UUID?
     @State private var addHovered = false
+    @State private var settingsHovered = false
     @State private var dropTargeted = false
+
+    private var selectedFolderID: UUID? {
+        if case .folder(let id) = selection { return id }
+        return nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,10 +137,10 @@ private struct SidebarView: View {
                         ForEach(store.folders) { folder in
                             SidebarRowView(
                                 folder: folder,
-                                isSelected: folder.id == selection,
+                                isSelected: folder.id == selectedFolderID,
                                 isHovered: folder.id == hoveredFolderID
                             )
-                            .onTapGesture { selection = folder.id }
+                            .onTapGesture { selection = .folder(folder.id) }
                             .onHover { hovering in
                                 hoveredFolderID = hovering ? folder.id : nil
                             }
@@ -127,7 +150,7 @@ private struct SidebarView: View {
                                 }
                                 Divider()
                                 Button(role: .destructive) {
-                                    if selection == folder.id { selection = nil }
+                                    if selectedFolderID == folder.id { selection = nil }
                                     store.remove(folder)
                                 } label: {
                                     l10n("Remove")
@@ -139,8 +162,11 @@ private struct SidebarView: View {
                 }
             }
 
-            addButton
-                .padding(12)
+            HStack(spacing: 8) {
+                addButton
+                settingsButton
+            }
+            .padding(12)
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .dropDestination(for: URL.self) { urls, _ in
@@ -149,7 +175,7 @@ private struct SidebarView: View {
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else { return false }
             if let folder = store.add(url) {
-                selection = folder.id
+                selection = .folder(folder.id)
             }
             return true
         } isTargeted: { dropTargeted = $0 }
@@ -170,7 +196,7 @@ private struct SidebarView: View {
     private var addButton: some View {
         Button {
             if let url = FolderPicker.chooseFolder(), let folder = store.add(url) {
-                selection = folder.id
+                selection = .folder(folder.id)
             }
         } label: {
             HStack(spacing: 6) {
@@ -193,6 +219,29 @@ private struct SidebarView: View {
         }
         .buttonStyle(.plain)
         .onHover { addHovered = $0 }
+    }
+
+    private var settingsButton: some View {
+        let isActive = selection == .settings
+        return Button {
+            selection = .settings
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(isActive ? .accentColor : settingsHovered ? .accentColor : .secondary)
+                .frame(width: 38, height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(
+                            Color.primary.opacity(settingsHovered || isActive ? 0.35 : 0.15),
+                            style: StrokeStyle(lineWidth: 1, dash: [5, 3])
+                        )
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { settingsHovered = $0 }
+        .help(l10nString("Settings"))
     }
 }
 
