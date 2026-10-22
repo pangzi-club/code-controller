@@ -15,25 +15,44 @@
 
 ## 运行
 
+快速开发迭代时：
+
 ```bash
 swift run
 ```
 
-或用 Xcode 打开 `Package.swift` 后直接 Cmd+R 运行。
+注意：`swift run` 执行的是裸二进制，Launch Services 会把它当作后台进程 —— 没有 Dock 图标，也没有自己的菜单栏。
+
+项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make clean`。运行 `make help` 查看全部。
+
+## 打包成 .app
+
+想要完整体验（Dock 图标、菜单栏、Cmd+Tab、可在 Finder 中双击打开），需要组装应用包：
+
+```bash
+./Scripts/make-app.sh          # 产物：build/FileBrowser.app
+open build/FileBrowser.app
+```
+
+脚本会构建 release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）并做 ad-hoc 签名。应用身份统一定义在 `Sources/FileBrowser/AppInfo.swift`：脚本从它读取显示名、bundle ID 和版本，target/二进制名则从 `Package.swift` 派生，没有任何重复定义。`.app` 的偏好设置存储在 bundle ID 名下，`swift run` 期间保存的文件夹不会自动带过去。
 
 ## 项目结构
 
 ```
 Sources/FileBrowser/
 ├── FileBrowserApp.swift   # 应用入口和窗口场景
+├── AppInfo.swift          # 显示名 / bundle ID / 版本（唯一事实来源）
 ├── ContentView.swift      # 分栏布局、侧边栏、占位页
 ├── FileListView.swift     # 卡片式文件列表
 ├── FolderStore.swift      # 侧边栏文件夹列表 + 持久化
 ├── Models.swift           # 文件加载、打开/定位助手、文件夹选择器
 ├── L10n.swift             # 本地化辅助
-└── Resources/
-    ├── en.lproj/Localizable.strings
-    └── zh-Hans.lproj/Localizable.strings
+├── Resources/
+│   ├── en.lproj/Localizable.strings
+│   └── zh-Hans.lproj/Localizable.strings
+Scripts/
+├── make-app.sh            # release 构建 + .app 包组装
+└── make-icon.swift        # 应用图标程序化生成
 ```
 
 ## 本地化说明
