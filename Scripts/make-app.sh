@@ -1,7 +1,7 @@
 #!/bin/bash
 # Assembles a proper .app bundle from the SwiftPM build.
-# App identity (display name, bundle ID, version) is parsed from
-# Sources/FileBrowser/AppInfo.swift; the target/binary name is derived from
+# App identity (display name, bundle ID, version) is parsed from the
+# AppInfo.swift next to the sources; the target/binary name is derived from
 # Package.swift via `swift package describe`, so nothing is duplicated here.
 # Usage: ./Scripts/make-app.sh   (result: build/<display name>.app)
 set -euo pipefail
@@ -14,13 +14,15 @@ die() { echo "error: $*" >&2; exit 1; }
 # --- Target/binary name: ask SwiftPM -----------------------------------------
 [[ -x /usr/bin/python3 ]] || die "/usr/bin/python3 not available"
 PACKAGE_JSON="$(swift package describe --type json)"
-TARGET_NAME="$(/usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["targets"][0]["name"])' <<<"$PACKAGE_JSON")"
+# Pick the executable target by type: test targets appear in the list too.
+TARGET_NAME="$(/usr/bin/python3 -c 'import json,sys; print(next(t["name"] for t in json.load(sys.stdin)["targets"] if t.get("type") == "executable"))' <<<"$PACKAGE_JSON")"
 PACKAGE_NAME="$(/usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])' <<<"$PACKAGE_JSON")"
 [[ -n "$TARGET_NAME" && -n "$PACKAGE_NAME" ]] || die "could not read names from Package.swift"
 
 # --- Identity: parsed from AppInfo.swift --------------------------------------
-APPINFO="Sources/FileBrowser/AppInfo.swift"
-[[ -f "$APPINFO" ]] || die "missing $APPINFO"
+# The path is discovered so the script keeps working after Scripts/rename.sh.
+APPINFO="$(ls Sources/*/AppInfo.swift 2>/dev/null | head -1)"
+[[ -n "$APPINFO" && -f "$APPINFO" ]] || die "Sources/*/AppInfo.swift not found"
 read_swift_constant() {
     sed -nE "s/^[[:space:]]*static let $1[[:space:]]*=[[:space:]]*\"([^\"]+)\".*/\1/p" "$APPINFO"
 }

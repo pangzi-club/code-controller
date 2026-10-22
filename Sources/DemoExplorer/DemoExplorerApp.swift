@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct FileBrowserApp: App {
+struct DemoExplorerApp: App {
     @StateObject private var settings = SettingsStore()
 
     var body: some Scene {

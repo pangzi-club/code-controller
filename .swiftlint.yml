@@ -1,0 +1,13 @@
+# SwiftLint configuration — https://github.com/realm/SwiftLint
+# Install SwiftLint with `brew install swiftlint`, then run `make lint` / `make format`.
+
+included:
+  - Sources
+  - Tests
+
+disabled_rules:
+  - identifier_name   # short names (id, url, l10n) are idiomatic in this codebase
+  - line_length       # SwiftUI modifier chains run long without being wrong
+
+opt_in_rules:
+  - empty_count       # prefer isEmpty over count == 0
