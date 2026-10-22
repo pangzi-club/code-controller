@@ -6,6 +6,7 @@ struct FileBrowserApp: App {
         WindowGroup {
             ContentView()
                 .frame(minWidth: 760, minHeight: 500)
+                .background(WindowFrameAutosaver.mainWindow)
         }
         .windowToolbarStyle(.unified(showsTitle: true))
     }
