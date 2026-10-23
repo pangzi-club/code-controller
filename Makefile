@@ -21,14 +21,6 @@ build: ## Release build
 test: ## Run tests (Swift Testing + XCTest)
 	swift test
 
-lint: ## Lint with SwiftLint (brew install swiftlint)
-	@command -v swiftlint >/dev/null 2>&1 || { echo "swiftlint is not installed: brew install swiftlint"; exit 1; }
-	swiftlint lint
-
-format: ## Auto-fix lint issues with SwiftLint
-	@command -v swiftlint >/dev/null 2>&1 || { echo "swiftlint is not installed: brew install swiftlint"; exit 1; }
-	swiftlint lint --fix
-
 app: ## Assemble the .app bundle
 	./Scripts/make-app.sh
 
@@ -44,4 +36,4 @@ clean: ## Remove build artifacts
 	swift package clean
 	rm -rf build/
 
-.PHONY: help dev build test lint format app launch rename clean
+.PHONY: help dev build test app launch rename clean

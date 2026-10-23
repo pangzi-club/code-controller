@@ -36,8 +36,8 @@ swift test    # or: make test
 
 There is also a `Makefile` with npm-scripts style shortcuts: `make dev` (debug
 run), `make test`, `make app` (assemble the .app), `make launch` (assemble +
-open), `make build`, `make lint` / `make format` (SwiftLint), `make rename`
-(template rename), `make clean`. Run `make help` to list them.
+open), `make build`, `make rename` (template rename), `make clean`. Run
+`make help` to list them.
 
 ## Xcode Previews
 

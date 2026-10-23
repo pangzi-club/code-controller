@@ -23,7 +23,6 @@ a library product, not a command-line tool.
 - `make build` — release build
 - `make app` — assemble `build/<Display Name>.app` (release build + icon + ad-hoc signing)
 - `make launch` — assemble and open the .app
-- `make lint` / `make format` — SwiftLint (must be installed: `brew install swiftlint`)
 - `make rename NEW=MyApp ID=com.me.MyApp` — full template rename (see below)
 
 ## Rules of the codebase

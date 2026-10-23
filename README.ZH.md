@@ -30,7 +30,7 @@ swift run
 swift test    # 或：make test
 ```
 
-项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make lint` / `make format`（SwiftLint）、`make rename`（模板重命名）、`make clean`。运行 `make help` 查看全部。
+项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make rename`（模板重命名）、`make clean`。运行 `make help` 查看全部。
 
 ## Xcode Preview
 
