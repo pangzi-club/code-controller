@@ -19,6 +19,12 @@ public struct ContentView: View {
         } detail: {
             detailContent
         }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 1)
+                .ignoresSafeArea(edges: .horizontal)
+        }
         .onAppear {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }

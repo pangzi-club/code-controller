@@ -25,13 +25,16 @@ struct DemoExplorerApp: App {
 }
 
 /// Matches the window background to the content, so the frame edges and
-/// overscroll areas stay white instead of the default gray.
+/// overscroll areas stay white instead of the default gray. The hairline
+/// under the toolbar is drawn by ContentView's top overlay; the system
+/// separator is explicitly disabled so it can never double up with ours.
 private struct TitlebarFlattener: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             window.backgroundColor = .controlBackgroundColor
+            window.titlebarSeparatorStyle = .none
         }
         return view
     }
