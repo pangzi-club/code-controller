@@ -8,6 +8,12 @@ A SwiftUI macOS desktop app template built with SwiftPM only — there is no
 `.xcodeproj`. Targets macOS 13+ with Swift tools 5.9. The demo app is a small
 file browser; replace its domain code when forking the template.
 
+The package has two targets: a **library** (`DemoExplorer`, all the views,
+models, stores and helpers) and a thin **executable** (`DemoExplorerApp`, just
+the `@main` entry point). Splitting them lets Xcode Previews work — open
+`Package.swift` in Xcode and preview with the library scheme; previews require
+a library product, not a command-line tool.
+
 ## Commands
 
 `make help` lists everything. The ones that matter:
@@ -38,8 +44,15 @@ file browser; replace its domain code when forking the template.
   in `Tests/DemoExplorerTests/`. Add tests for new logic in `Models.swift`,
   stores, and helpers; views don't need snapshot tests in this template.
 - **State** lives in `ObservableObject` stores (`SettingsStore`, `FolderStore`)
-  persisted to UserDefaults and injected via `.environmentObject`. The window
-  frame persists through `WindowFrameAutosaver` under a fixed autosave name.
+  persisted to UserDefaults and injected via `.environmentObject`. The main
+  window frame persists through `WindowFrameAutosaver` — manual save/restore
+  under the fixed UserDefaults key `mainWindowFrame`, bypassing NSWindow
+  autosave so `swift run` and the .app behave identically. The pure logic in
+  `WindowFramePersistence` (parse / restorable / clamp / default) has tests.
+- **Access control**: the library target (`Sources/DemoExplorer/`) must mark
+  types and members `public` when the executable target
+  (`Sources/DemoExplorerApp/`) uses them. Protocol requirements (`body`,
+  `makeNSView`, `updateNSView`, …) on public types must also be `public`.
 
 ## Gotchas
 
@@ -59,8 +72,8 @@ file browser; replace its domain code when forking the template.
 ## Using the template / renaming
 
 `./Scripts/rename.sh NewName com.example.newid` renames everything in one
-shot: `Package.swift`, `Sources/`/`Tests/` directories, the `@main` struct,
-`AppInfo.swift` identity, READMEs and this file. The Makefile and
-`make-app.sh` discover `AppInfo.swift` via `Sources/*/AppInfo.swift`, so they
-keep working across renames. The bundle ID defaults to `com.example.<NewName>`
-when omitted.
+shot: `Package.swift`, the `Sources/`/`Tests/` directories (the executable
+target becomes `NewNameApp`), the `@main` struct, `AppInfo.swift` identity,
+READMEs and this file. The Makefile and `make-app.sh` discover `AppInfo.swift`
+via `Sources/*/AppInfo.swift`, so they keep working across renames. The bundle
+ID defaults to `com.example.<NewName>` when omitted.

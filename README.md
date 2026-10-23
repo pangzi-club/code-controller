@@ -3,7 +3,9 @@
 [English](README.md) | [中文](README.ZH.md)
 
 A SwiftUI + SwiftPM template for macOS desktop apps, demonstrated by a simple
-file browser — no Xcode project needed.
+file browser — no Xcode project needed. The package splits into a library
+(all app code) and a thin `@main` executable, so Xcode Previews work out of
+the box.
 
 ## Features
 
@@ -37,6 +39,16 @@ run), `make test`, `make app` (assemble the .app), `make launch` (assemble +
 open), `make build`, `make lint` / `make format` (SwiftLint), `make rename`
 (template rename), `make clean`. Run `make help` to list them.
 
+## Xcode Previews
+
+Open `Package.swift` in Xcode (it synthesizes the schemes; `.swiftpm/` is
+gitignored). The package has two targets: the **DemoExplorer** library with
+all views, models and stores, and the **DemoExplorerApp** executable that only
+holds the `@main` entry point. Previews need a library product — a
+command-line-tool target cannot power the canvas — so the views (each file
+ends in a `#Preview` block) preview against the library scheme. Types used by
+the executable target must be `public`.
+
 ## Using This as a Template
 
 To start a new app from this repository, rename everything in one shot:
@@ -45,12 +57,12 @@ To start a new app from this repository, rename everything in one shot:
 ./Scripts/rename.sh MyApp com.you.MyApp
 ```
 
-This renames the package and target in `Package.swift`, moves `Sources/` and
-`Tests/`, renames the `@main` struct, and updates the identity in
-`AppInfo.swift` (the bundle ID defaults to `com.example.<NewName>` when
-omitted), the READMEs and `AGENTS.md`. The display name can then be tuned
-freely in `AppInfo.swift` — it may contain spaces. `AGENTS.md` also documents
-the conventions and known gotchas of this codebase.
+This renames the package and targets in `Package.swift`, moves `Sources/` and
+`Tests/` (the executable target becomes `MyAppApp`), renames the `@main`
+struct, and updates the identity in `AppInfo.swift` (the bundle ID defaults to
+`com.example.<NewName>` when omitted), the READMEs and `AGENTS.md`. The display
+name can then be tuned freely in `AppInfo.swift` — it may contain spaces.
+`AGENTS.md` also documents the conventions and known gotchas of this codebase.
 
 ## Packaging as a .app
 
@@ -73,26 +85,28 @@ sessions won't carry over.
 ## Project Layout
 
 ```
-Sources/DemoExplorer/
-├── DemoExplorerApp.swift        # App entry point and window scene
-├── AppInfo.swift                # Display name / bundle ID / version (single source of truth)
-├── ContentView.swift            # Split layout, sidebar, settings entry
-├── FileListView.swift           # Card-style file list
-├── FolderStore.swift            # Sidebar folder list + persistence
-├── Models.swift                 # File loading, open/reveal helpers, folder picker
-├── L10n.swift                   # Localization helpers
-├── SettingsStore.swift          # Theme preference + persistence
-├── SettingsView.swift           # Settings page (theme picker)
-├── WindowFrameAutosaver.swift   # Stable window frame autosave
-├── Resources/
-│   ├── en.lproj/Localizable.strings
-│   └── zh-Hans.lproj/Localizable.strings
-Tests/DemoExplorerTests/         # Swift Testing suite
+Sources/
+├── DemoExplorer/                 # Library target: all views, models, stores
+│   ├── AppInfo.swift             # Display name / bundle ID / version (single source of truth)
+│   ├── ContentView.swift         # Split layout, sidebar, settings entry
+│   ├── FileListView.swift        # Card-style file list
+│   ├── FolderStore.swift         # Sidebar folder list + persistence
+│   ├── Models.swift              # File loading, open/reveal helpers, folder picker
+│   ├── L10n.swift                # Localization helpers
+│   ├── SettingsStore.swift       # Theme preference + persistence
+│   ├── SettingsView.swift        # Settings page (theme picker)
+│   ├── WindowFrameAutosaver.swift # Manual window frame save/restore (tested pure logic)
+│   └── Resources/
+│       ├── en.lproj/Localizable.strings
+│       └── zh-Hans.lproj/Localizable.strings
+└── DemoExplorerApp/
+    └── DemoExplorerApp.swift     # Thin @main entry point and window scene
+Tests/DemoExplorerTests/          # Swift Testing suite
 Scripts/
-├── make-app.sh                  # Release build + .app bundle assembly
-├── make-icon.swift              # Programmatic app icon generator
-└── rename.sh                    # One-shot template rename
-AGENTS.md                        # Conventions and gotchas for humans and agents
+├── make-app.sh                   # Release build + .app bundle assembly
+├── make-icon.swift               # Programmatic app icon generator
+└── rename.sh                     # One-shot template rename
+AGENTS.md                         # Conventions and gotchas for humans and agents
 ```
 
 ## Localization Notes

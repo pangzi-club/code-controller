@@ -6,11 +6,13 @@ enum SidebarSelection: Hashable {
     case settings
 }
 
-struct ContentView: View {
+public struct ContentView: View {
     @StateObject private var store = FolderStore()
     @State private var selection: SidebarSelection?
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         NavigationSplitView {
             SidebarView(store: store, selection: $selection)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
@@ -81,7 +83,7 @@ private struct PlaceholderView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 }
 
@@ -308,4 +310,11 @@ extension URL {
         guard path.hasPrefix(home) else { return path }
         return "~" + path.dropFirst(home.count)
     }
+}
+
+#Preview {
+    ContentView()
+        .environmentObject(SettingsStore())
+        .frame(width: 1080, height: 720)
+        .toolbarBackground(Color(nsColor: .controlBackgroundColor), for: .windowToolbar)
 }

@@ -26,7 +26,7 @@ struct FileListView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color(nsColor: .controlBackgroundColor))
         .navigationTitle(folder.name)
         .toolbar {
             ToolbarItemGroup {
@@ -153,4 +153,11 @@ struct FileListView: View {
         }
         return parts.joined(separator: " · ")
     }
+}
+
+#Preview {
+    FileListView(
+        folder: Folder(id: UUID(), url: URL(fileURLWithPath: "/Users/bohaowang/Workspace/App/swiftui-starter"))
+    )
+    .frame(width: 600, height: 500)
 }

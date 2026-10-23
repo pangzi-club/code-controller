@@ -46,8 +46,11 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 echo "==> Copying binary and resources…"
 cp ".build/release/$TARGET_NAME" "$CONTENTS/MacOS/$TARGET_NAME"
-# Bundle.module resolves this resource bundle from the app's Resources directory.
-cp -R ".build/release/${PACKAGE_NAME}_${TARGET_NAME}.bundle" "$CONTENTS/Resources/"
+# Bundle.module resolves this resource bundle from the library target's
+# Resources directory (the binary target name differs from the library's).
+RESOURCE_BUNDLE="$(ls -d .build/release/${PACKAGE_NAME}_*.bundle 2>/dev/null | head -1)"
+[[ -n "$RESOURCE_BUNDLE" ]] || die "resource bundle not found in .build/release"
+cp -R "$RESOURCE_BUNDLE" "$CONTENTS/Resources/"
 
 echo "==> Generating app icon…"
 swift Scripts/make-icon.swift "$BUILD_DIR"

@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.ZH.md)
 
-一个基于 SwiftUI 和 SwiftPM 的 macOS 桌面应用模板，以一个简单的文件浏览器作为示例 —— 无需 Xcode 工程文件。
+一个基于 SwiftUI 和 SwiftPM 的 macOS 桌面应用模板，以一个简单的文件浏览器作为示例 —— 无需 Xcode 工程文件。包内拆分为 library（全部应用代码）和只含 `@main` 的薄 executable，因此 Xcode Preview 开箱即用。
 
 ## 功能
 
@@ -32,6 +32,10 @@ swift test    # 或：make test
 
 项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make lint` / `make format`（SwiftLint）、`make rename`（模板重命名）、`make clean`。运行 `make help` 查看全部。
 
+## Xcode Preview
+
+用 Xcode 打开 `Package.swift`（scheme 由 Xcode 自动生成；`.swiftpm/` 已被 gitignore）。包内有两个 target：**DemoExplorer** library 包含全部视图、模型和 store；**DemoExplorerApp** executable 只保留 `@main` 入口。Preview 必须依赖 library 产物 —— 命令行工具类型的 target 无法驱动画布 —— 因此各视图文件末尾的 `#Preview` 都走 library scheme。executable target 要用到的类型需要标记 `public`。
+
 ## 作为模板使用
 
 基于本仓库开发新应用时，一条命令完成整体重命名：
@@ -40,7 +44,7 @@ swift test    # 或：make test
 ./Scripts/rename.sh MyApp com.you.MyApp
 ```
 
-脚本会重命名 `Package.swift` 中的包和 target、移动 `Sources/` 与 `Tests/` 目录、重命名 `@main` 结构体，并更新 `AppInfo.swift` 中的身份信息（未指定 bundle ID 时默认 `com.example.<NewName>`）、README 和 `AGENTS.md`。显示名之后可以在 `AppInfo.swift` 里随意调整（允许包含空格）。代码库的约定和已知坑都记录在 `AGENTS.md` 中。
+脚本会重命名 `Package.swift` 中的包和 target、移动 `Sources/` 与 `Tests/` 目录（executable target 会变成 `MyAppApp`）、重命名 `@main` 结构体，并更新 `AppInfo.swift` 中的身份信息（未指定 bundle ID 时默认 `com.example.<NewName>`）、README 和 `AGENTS.md`。显示名之后可以在 `AppInfo.swift` 里随意调整（允许包含空格）。代码库的约定和已知坑都记录在 `AGENTS.md` 中。
 
 ## 打包成 .app
 
@@ -56,26 +60,28 @@ open build/DemoExplorer.app
 ## 项目结构
 
 ```
-Sources/DemoExplorer/
-├── DemoExplorerApp.swift        # 应用入口和窗口场景
-├── AppInfo.swift                # 显示名 / bundle ID / 版本（唯一事实来源）
-├── ContentView.swift            # 分栏布局、侧边栏、设置入口
-├── FileListView.swift           # 卡片式文件列表
-├── FolderStore.swift            # 侧边栏文件夹列表 + 持久化
-├── Models.swift                 # 文件加载、打开/定位助手、文件夹选择器
-├── L10n.swift                   # 本地化辅助
-├── SettingsStore.swift          # 主题偏好 + 持久化
-├── SettingsView.swift           # 设置页（主题切换）
-├── WindowFrameAutosaver.swift   # 稳定的窗口位置记忆
-├── Resources/
-│   ├── en.lproj/Localizable.strings
-│   └── zh-Hans.lproj/Localizable.strings
-Tests/DemoExplorerTests/         # Swift Testing 测试
+Sources/
+├── DemoExplorer/                 # Library target：全部视图、模型、store
+│   ├── AppInfo.swift             # 显示名 / bundle ID / 版本（唯一事实来源）
+│   ├── ContentView.swift         # 分栏布局、侧边栏、设置入口
+│   ├── FileListView.swift        # 卡片式文件列表
+│   ├── FolderStore.swift         # 侧边栏文件夹列表 + 持久化
+│   ├── Models.swift              # 文件加载、打开/定位助手、文件夹选择器
+│   ├── L10n.swift                # 本地化辅助
+│   ├── SettingsStore.swift       # 主题偏好 + 持久化
+│   ├── SettingsView.swift        # 设置页（主题切换）
+│   ├── WindowFrameAutosaver.swift # 窗口位置手动保存/恢复（纯逻辑有测试）
+│   └── Resources/
+│       ├── en.lproj/Localizable.strings
+│       └── zh-Hans.lproj/Localizable.strings
+└── DemoExplorerApp/
+    └── DemoExplorerApp.swift     # 薄 @main 入口和窗口场景
+Tests/DemoExplorerTests/          # Swift Testing 测试
 Scripts/
-├── make-app.sh                  # release 构建 + .app 包组装
-├── make-icon.swift              # 应用图标程序化生成
-└── rename.sh                    # 一键模板重命名
-AGENTS.md                        # 面向人和 agent 的约定与坑位说明
+├── make-app.sh                   # release 构建 + .app 包组装
+├── make-icon.swift               # 应用图标程序化生成
+└── rename.sh                     # 一键模板重命名
+AGENTS.md                         # 面向人和 agent 的约定与坑位说明
 ```
 
 ## 本地化说明

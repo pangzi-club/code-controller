@@ -7,7 +7,8 @@
 #   ./Scripts/rename.sh <NewName> [com.example.newid]
 #
 # <NewName> must be a valid Swift identifier (it becomes the package name,
-# target name, directory name and struct prefix). The bundle ID defaults to
+# library target name, directory name and struct prefix). The executable
+# target becomes <NewName>App. The bundle ID defaults to
 # com.example.<NewName>. The display name can be changed afterwards directly
 # in AppInfo.swift (it may contain spaces).
 set -euo pipefail
@@ -21,10 +22,19 @@ die() { echo "error: $*" >&2; exit 1; }
 NEW="$1"
 BUNDLE_ID="${2:-}"
 
-# --- Current name: the single target directory under Sources/ -----------------
+# --- Current name: the library target directory under Sources/ -----------------
+# The library target is the one whose name does NOT end in "App".
 SOURCE_DIRS=(Sources/*/)
-[[ ${#SOURCE_DIRS[@]} -eq 1 ]] || die "expected exactly one directory under Sources/"
-OLD="$(basename "${SOURCE_DIRS[0]}")"
+[[ ${#SOURCE_DIRS[@]} -ge 2 ]] || die "expected at least two directories under Sources/"
+OLD=""
+for dir in "${SOURCE_DIRS[@]}"; do
+    name="$(basename "$dir")"
+    if [[ "$name" != *App ]]; then
+        OLD="$name"
+        break
+    fi
+done
+[[ -n "$OLD" ]] || die "could not find library target directory under Sources/"
 [[ "$OLD" != "$NEW" ]] || die "already named $OLD"
 
 [[ "$NEW" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] || die "$NEW is not a valid Swift identifier"
@@ -36,12 +46,17 @@ fi
 echo "==> Renaming $OLD -> $NEW (bundle ID: $BUNDLE_ID)"
 
 # --- Move directories and the @main struct file -------------------------------
+# Library target directory
 git mv "Sources/$OLD" "Sources/$NEW"
+# Executable target directory
+if [[ -d "Sources/${OLD}App" ]]; then
+    git mv "Sources/${OLD}App" "Sources/${NEW}App"
+fi
 if [[ -d "Tests/${OLD}Tests" ]]; then
     git mv "Tests/${OLD}Tests" "Tests/${NEW}Tests"
 fi
-if [[ -f "Sources/$NEW/${OLD}App.swift" ]]; then
-    git mv "Sources/$NEW/${OLD}App.swift" "Sources/$NEW/${NEW}App.swift"
+if [[ -f "Sources/${NEW}App/${OLD}App.swift" ]]; then
+    git mv "Sources/${NEW}App/${OLD}App.swift" "Sources/${NEW}App/${NEW}App.swift"
 fi
 
 # --- Replace every occurrence in docs and sources ------------------------------

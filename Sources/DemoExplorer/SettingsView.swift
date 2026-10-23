@@ -18,7 +18,7 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color(nsColor: .controlBackgroundColor))
         .navigationTitle(l10n("Settings"))
     }
 
@@ -55,4 +55,10 @@ struct SettingsView: View {
             )
             .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
     }
+}
+
+#Preview {
+    SettingsView()
+        .environmentObject(SettingsStore())
+        .frame(width: 640, height: 400)
 }
