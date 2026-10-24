@@ -13,11 +13,15 @@
 "Add a folder to get started" = "Add a folder to get started";
 "Choose a folder" = "Choose a folder";
 "Settings" = "Settings";
-"Appearance" = "Appearance";
+"General" = "General";
 "Theme" = "Theme";
 "System" = "System";
 "Light" = "Light";
 "Dark" = "Dark";
+"Language" = "Language";
+"English" = "English";
+"Simplified Chinese" = "简体中文";
+"Restart to apply the new language" = "Restart to apply the new language";
 "About" = "About";
 "Hide" = "Hide";
 "Quit" = "Quit";

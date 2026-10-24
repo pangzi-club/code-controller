@@ -25,7 +25,7 @@ final class SettingsWindowController: NSWindowController {
         content.view.layoutSubtreeIfNeeded()
         let fitting = content.view.fittingSize
         // Sized for growth: the floor leaves room for future settings
-        // sections beyond the current appearance card.
+        // sections beyond the current General card.
         window.setContentSize(NSSize(width: max(fitting.width, 480), height: max(fitting.height, 320)))
 
         super.init(window: window)

@@ -6,28 +6,53 @@ import Foundation
 /// "zh-Hans" preference against the lowercased "zh-hans.lproj" directory that
 /// SwiftPM produces, so `Bundle.localizedString` would always return English.
 enum L10n {
-    private static let stringsBundle: Bundle = {
-        // SwiftPM lowercases ".lproj" directory names, and Bundle's registered
-        // resource names are case-sensitive — look up "zh-hans" explicitly.
-        func chineseBundle() -> Bundle? {
-            for name in ["zh-Hans", "zh-hans"] {
-                if let path = Bundle.module.path(forResource: name, ofType: "lproj"),
-                   let bundle = Bundle(path: path) {
-                    return bundle
-                }
-            }
-            return nil
-        }
+    /// The language the system selects: the first preferred language the app
+    /// localizes for; English when nothing matches.
+    static let systemLanguage: LanguagePreference = {
         for language in Locale.preferredLanguages {
             // Only match Simplified Chinese variants; Traditional Chinese
             // (zh-Hant, zh-TW, zh-HK) falls through to English since no
             // Traditional localization exists.
             if language == "zh" || language.hasPrefix("zh-Hans") || language.hasPrefix("zh-hans") {
-                if let bundle = chineseBundle() { return bundle }
+                return .simplifiedChinese
             }
-            if language.hasPrefix("en") { return .module }
+            if language.hasPrefix("en") {
+                return .english
+            }
         }
-        return .module
+        return .english
+    }()
+
+    /// The language the UI strings resolve for, fixed at launch: the Settings
+    /// override if one is stored, otherwise the system language. Strings are
+    /// baked into views and menus when they are built, so a changed setting
+    /// takes effect on relaunch.
+    static let launchLanguage: LanguagePreference = {
+        guard let stored = LanguagePreference(
+            rawValue: UserDefaults.standard.string(forKey: LanguagePreference.defaultsKey) ?? ""
+        ), stored != .system else {
+            return systemLanguage
+        }
+        return stored
+    }()
+
+    private static let chineseBundle: Bundle? = {
+        // SwiftPM lowercases ".lproj" directory names, and Bundle's registered
+        // resource names are case-sensitive — look up "zh-hans" explicitly.
+        for name in ["zh-Hans", "zh-hans"] {
+            if let path = Bundle.module.path(forResource: name, ofType: "lproj"),
+               let bundle = Bundle(path: path) {
+                return bundle
+            }
+        }
+        return nil
+    }()
+
+    private static let stringsBundle: Bundle = {
+        switch launchLanguage {
+        case .english, .system: return .module
+        case .simplifiedChinese: return chineseBundle ?? .module
+        }
     }()
 
     static func string(forKey key: String) -> String {

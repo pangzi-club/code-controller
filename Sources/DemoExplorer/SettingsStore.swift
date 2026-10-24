@@ -26,6 +26,27 @@ enum ThemePreference: String, CaseIterable {
     }
 }
 
+/// User-selectable interface language.
+enum LanguagePreference: String, CaseIterable {
+    case system
+    case english = "en"
+    case simplifiedChinese = "zh-Hans"
+
+    /// UserDefaults key; L10n reads the same key when it fixes the launch
+    /// language, so this is the single source of truth.
+    static let defaultsKey = "language"
+
+    /// Localization key for the picker item. Language names keep their
+    /// autonyms ("English", "简体中文") in both localizations.
+    var labelKey: String {
+        switch self {
+        case .system: "System"
+        case .english: "English"
+        case .simplifiedChinese: "Simplified Chinese"
+        }
+    }
+}
+
 /// App-wide user settings, persisted to UserDefaults.
 @MainActor
 final class SettingsStore: ObservableObject {
@@ -33,10 +54,16 @@ final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey) }
     }
 
+    @Published var language: LanguagePreference {
+        didSet { UserDefaults.standard.set(language.rawValue, forKey: LanguagePreference.defaultsKey) }
+    }
+
     private static let themeKey = "theme"
 
     init() {
         theme = UserDefaults.standard.string(forKey: Self.themeKey)
             .flatMap(ThemePreference.init(rawValue:)) ?? .system
+        language = UserDefaults.standard.string(forKey: LanguagePreference.defaultsKey)
+            .flatMap(LanguagePreference.init(rawValue:)) ?? .system
     }
 }

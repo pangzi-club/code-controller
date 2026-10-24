@@ -2,12 +2,13 @@ import AppKit
 import Testing
 @testable import DemoExplorer
 
-// Serialized: the tests share the `theme` UserDefaults key.
+// Serialized: the tests share the `theme` and `language` UserDefaults keys.
 @Suite(.serialized)
 @MainActor
 struct SettingsStoreTests {
     private func cleanUp() {
         UserDefaults.standard.removeObject(forKey: "theme")
+        UserDefaults.standard.removeObject(forKey: LanguagePreference.defaultsKey)
     }
 
     @Test("theme falls back to system when nothing (or garbage) is stored")
@@ -42,6 +43,34 @@ struct SettingsStoreTests {
     func rawValueRoundTrip() {
         for theme in ThemePreference.allCases {
             #expect(ThemePreference(rawValue: theme.rawValue) == theme)
+        }
+    }
+
+    @Test("language falls back to system when nothing (or garbage) is stored")
+    func languageFallback() {
+        cleanUp()
+        #expect(SettingsStore().language == .system)
+
+        UserDefaults.standard.set("klingon", forKey: LanguagePreference.defaultsKey)
+        defer { cleanUp() }
+        #expect(SettingsStore().language == .system)
+    }
+
+    @Test("setting a language persists it for the next launch")
+    func languagePersists() {
+        cleanUp()
+        defer { cleanUp() }
+
+        SettingsStore().language = .simplifiedChinese
+
+        #expect(UserDefaults.standard.string(forKey: LanguagePreference.defaultsKey) == "zh-Hans")
+        #expect(SettingsStore().language == .simplifiedChinese)
+    }
+
+    @Test("every language round-trips through its raw value")
+    func languageRawValueRoundTrip() {
+        for language in LanguagePreference.allCases {
+            #expect(LanguagePreference(rawValue: language.rawValue) == language)
         }
     }
 }

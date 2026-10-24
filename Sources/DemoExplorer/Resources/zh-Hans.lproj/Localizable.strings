@@ -13,11 +13,15 @@
 "Add a folder to get started" = "添加一个文件夹开始使用";
 "Choose a folder" = "选择一个文件夹";
 "Settings" = "设置";
-"Appearance" = "外观";
+"General" = "通用";
 "Theme" = "主题";
 "System" = "跟随系统";
 "Light" = "浅色";
 "Dark" = "深色";
+"Language" = "语言";
+"English" = "English";
+"Simplified Chinese" = "简体中文";
+"Restart to apply the new language" = "重启后生效";
 "About" = "关于";
 "Hide" = "隐藏";
 "Quit" = "退出";

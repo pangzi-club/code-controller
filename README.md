@@ -11,10 +11,10 @@ built in code. The package splits into a library (all app code) and a thin
 
 - **Sidebar**: a folder table with rounded accent selection and hover highlight; add folders with the "Add Folder" button or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path.
 - **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Native selection semantics: click to select, arrow keys to navigate, double-click / Return / ⌘O to open; the context menu offers "Open" and "Show in Finder". The list watches the folder on disk and refreshes itself (keeping the selection) when its contents change.
-- **Settings window**: system/light/dark theme picker, persisted and applied app-wide, opened with ⌘, like a proper macOS preferences window.
+- **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide, opened with ⌘, like a proper macOS preferences window.
 - **Menu bar & toolbar**: the menu bar is built programmatically in `AppDelegate` — About, Settings, Hide/Hide Others/Show All, Quit, plus File (Open ⌘O), Edit (Undo/Redo/Cut/Copy/Paste/Select All/Services/Emoji & Symbols), View (Toggle Sidebar ⌥⌘S), Window and Help. The window shows a unified toolbar with the sidebar toggle and the folder name as the inline title; no MainMenu.xib is needed.
 - **Persistence**: the folder list lives in UserDefaults (stale paths are dropped), and the window frame survives relaunches.
-- **Localization**: English and Simplified Chinese, following the system language — including every menu title.
+- **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch) — including every menu title.
 - Adapts to light and dark appearance.
 
 ## Running
@@ -96,8 +96,8 @@ Sources/
 │   ├── L10n.swift                 # Localization helpers
 │   ├── MainWindowController.swift # Main window, split view, detail pane, frame persistence
 │   ├── Models.swift               # File loading, open/reveal helpers, folder picker
-│   ├── SettingsStore.swift        # Theme preference + persistence
-│   ├── SettingsViewController.swift # Settings window content (theme picker)
+│   ├── SettingsStore.swift        # Theme + language preferences and persistence
+│   ├── SettingsViewController.swift # Settings window content (theme + language pickers)
 │   ├── SettingsWindowController.swift # The ⌘, settings window
 │   ├── SidebarViewController.swift  # Sidebar table, drag-and-drop, folder colors
 │   ├── StyleSupport.swift           # Background/shadow/badge/dashed-button helpers
@@ -120,5 +120,8 @@ AGENTS.md                          # Conventions and gotchas for humans and agen
 SwiftPM lowercases `.lproj` directory names in the built resource bundle, and
 `Bundle` resource lookup is case-sensitive, so the stock CFBundle matching can
 miss `zh-hans.lproj` for a `zh-Hans` user preference. `L10n` resolves the
-language against `Locale.preferredLanguages` and loads the matching `.lproj`
-bundle explicitly to work around this.
+language against the Settings override (if one is stored) and
+`Locale.preferredLanguages`, and loads the matching `.lproj` bundle explicitly
+to work around this. The language is fixed at launch — strings are baked into
+views and menus when they are built — so a changed setting asks to be
+relaunched before it applies.
