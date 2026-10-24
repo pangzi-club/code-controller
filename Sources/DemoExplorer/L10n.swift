@@ -19,7 +19,12 @@ enum L10n {
             return nil
         }
         for language in Locale.preferredLanguages {
-            if language.hasPrefix("zh"), let bundle = chineseBundle() { return bundle }
+            // Only match Simplified Chinese variants; Traditional Chinese
+            // (zh-Hant, zh-TW, zh-HK) falls through to English since no
+            // Traditional localization exists.
+            if language == "zh" || language.hasPrefix("zh-Hans") || language.hasPrefix("zh-hans") {
+                if let bundle = chineseBundle() { return bundle }
+            }
             if language.hasPrefix("en") { return .module }
         }
         return .module
