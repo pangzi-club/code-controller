@@ -12,11 +12,11 @@ cd "$ROOT"
 die() { echo "error: $*" >&2; exit 1; }
 
 # --- Target/binary name: ask SwiftPM -----------------------------------------
-[[ -x /usr/bin/python3 ]] || die "/usr/bin/python3 not available"
+command -v python3 >/dev/null 2>&1 || die "python3 not found in PATH"
 PACKAGE_JSON="$(swift package describe --type json)"
 # Pick the executable target by type: test targets appear in the list too.
-TARGET_NAME="$(/usr/bin/python3 -c 'import json,sys; print(next(t["name"] for t in json.load(sys.stdin)["targets"] if t.get("type") == "executable"))' <<<"$PACKAGE_JSON")"
-PACKAGE_NAME="$(/usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])' <<<"$PACKAGE_JSON")"
+TARGET_NAME="$(python3 -c 'import json,sys; print(next(t["name"] for t in json.load(sys.stdin)["targets"] if t.get("type") == "executable"))' <<<"$PACKAGE_JSON")"
+PACKAGE_NAME="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])' <<<"$PACKAGE_JSON")"
 [[ -n "$TARGET_NAME" && -n "$PACKAGE_NAME" ]] || die "could not read names from Package.swift"
 
 # --- Identity: parsed from AppInfo.swift --------------------------------------
