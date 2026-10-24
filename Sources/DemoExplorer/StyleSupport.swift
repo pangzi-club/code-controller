@@ -159,8 +159,23 @@ final class DashedButton: NSControl {
     override func mouseExited(with event: NSEvent) { hovered = false }
 
     override func mouseDown(with event: NSEvent) {
-        guard let action, let target else { return }
-        NSApp.sendAction(action, to: target, from: self)
+        // Track press visually and only fire on release inside bounds,
+        // matching standard NSButton behavior.
+        hovered = true
+        var done = false
+        while !done, let next = NSApp.nextEvent(
+            matching: .leftMouseUp,
+            until: Date.distantFuture,
+            inMode: .eventTracking,
+            dequeue: true
+        ) {
+            if bounds.contains(convert(next.locationInWindow, from: nil)) {
+                guard let action, let target else { hovered = false; return }
+                NSApp.sendAction(action, to: target, from: self)
+            }
+            done = true
+        }
+        hovered = false
     }
 
     /// Renders a template symbol in the given color (symbols draw black by
