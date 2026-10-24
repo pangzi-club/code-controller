@@ -9,10 +9,10 @@ built in code. The package splits into a library (all app code) and a thin
 
 ## Features
 
-- **Sidebar**: a folder table with rounded accent selection and hover highlight; add folders with the "Add Folder" button, the File menu (⌘N) or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path.
-- **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Double-click opens with the default app; the context menu offers "Open" and "Show in Finder"; rows highlight on hover with hairline separators between them.
-- **Settings page**: system/light/dark theme picker, persisted and applied app-wide through `NSApp.appearance`. Reachable from the sidebar gear or the ⌘, menu item.
-- **Menu bar & toolbar**: the menu bar is built programmatically in `AppDelegate` — About, Settings, Hide, Quit, plus File/Edit/View/Window menus (Toggle Sidebar is ⌥⌘S). The window shows a unified toolbar with the sidebar toggle and the folder name as the inline title; no MainMenu.xib is needed.
+- **Sidebar**: a folder table with rounded accent selection and hover highlight; add folders with the "Add Folder" button or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path.
+- **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Native selection semantics: click to select, arrow keys to navigate, double-click / Return / ⌘O to open; the context menu offers "Open" and "Show in Finder". The list watches the folder on disk and refreshes itself (keeping the selection) when its contents change.
+- **Settings window**: system/light/dark theme picker, persisted and applied app-wide, opened with ⌘, like a proper macOS preferences window.
+- **Menu bar & toolbar**: the menu bar is built programmatically in `AppDelegate` — About, Settings, Hide/Hide Others/Show All, Quit, plus File (Open ⌘O), Edit (Undo/Redo/Cut/Copy/Paste/Select All/Services/Emoji & Symbols), View (Toggle Sidebar ⌥⌘S), Window and Help. The window shows a unified toolbar with the sidebar toggle and the folder name as the inline title; no MainMenu.xib is needed.
 - **Persistence**: the folder list lives in UserDefaults (stale paths are dropped), and the window frame survives relaunches.
 - **Localization**: English and Simplified Chinese, following the system language — including every menu title.
 - Adapts to light and dark appearance.
@@ -97,7 +97,8 @@ Sources/
 │   ├── MainWindowController.swift # Main window, split view, detail pane, frame persistence
 │   ├── Models.swift               # File loading, open/reveal helpers, folder picker
 │   ├── SettingsStore.swift        # Theme preference + persistence
-│   ├── SettingsViewController.swift # Settings page (theme picker)
+│   ├── SettingsViewController.swift # Settings window content (theme picker)
+│   ├── SettingsWindowController.swift # The ⌘, settings window
 │   ├── SidebarViewController.swift  # Sidebar table, drag-and-drop, folder colors
 │   ├── StyleSupport.swift           # Background/shadow/badge/dashed-button helpers
 │   ├── WindowFramePersistence.swift # Manual window frame save/restore (tested pure logic)

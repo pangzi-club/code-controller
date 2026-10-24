@@ -1,7 +1,9 @@
 import AppKit
 import Combine
 
-/// Settings detail page: appearance card with the theme segmented control.
+/// Settings window content: the appearance section with the theme segmented
+/// control. Laid out like a native settings pane — rows pinned to the top
+/// edge, no card chrome — so future sections stack below without surgery.
 @MainActor
 final class SettingsViewController: NSViewController {
     private let settings: SettingsStore
@@ -19,26 +21,14 @@ final class SettingsViewController: NSViewController {
     override func loadView() {
         view = NSView()
 
-        let pageTitle = NSTextField(labelWithString: l10n("Settings"))
-        pageTitle.font = .systemFont(ofSize: 17, weight: .semibold)
-        pageTitle.textColor = .labelColor
-
         let heading = NSTextField(labelWithString: l10n("Appearance"))
         heading.font = .systemFont(ofSize: 13, weight: .semibold)
         heading.textColor = .secondaryLabelColor
 
-        let card = NSBox()
-        card.boxType = .custom
-        card.borderWidth = 1
-        card.borderColor = .separatorColor
-        card.cornerRadius = 10
-        card.fillColor = .controlBackgroundColor
-        card.contentViewMargins = NSSize(width: 16, height: 14)
-
         let icon = NSImageView(image: symbolImage("circle.lefthalf.filled", pointSize: 15, weight: .medium))
         icon.contentTintColor = .secondaryLabelColor
         let themeLabel = NSTextField(labelWithString: l10n("Theme"))
-        themeLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        themeLabel.font = .systemFont(ofSize: 13)
 
         segmented.segmentCount = ThemePreference.allCases.count
         for (index, theme) in ThemePreference.allCases.enumerated() {
@@ -50,31 +40,26 @@ final class SettingsViewController: NSViewController {
         segmented.action = #selector(themeChanged)
         segmented.widthAnchor.constraint(equalToConstant: 240).isActive = true
 
+        // Leading group hugs left, trailing group hugs right — label left,
+        // control right, the classic settings-row alignment.
         let row = NSStackView()
         row.addView(icon, in: .leading)
         row.addView(themeLabel, in: .leading)
         row.addView(segmented, in: .trailing)
         row.spacing = 12
-        card.contentView = row
 
-        let cardHost = ShadowContainer(content: card)
-        pageTitle.translatesAutoresizingMaskIntoConstraints = false
         heading.translatesAutoresizingMaskIntoConstraints = false
-        cardHost.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(pageTitle)
+        row.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(heading)
-        view.addSubview(cardHost)
+        view.addSubview(row)
         NSLayoutConstraint.activate([
-            pageTitle.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
-            pageTitle.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-
-            heading.topAnchor.constraint(equalTo: pageTitle.bottomAnchor, constant: 16),
+            heading.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
             heading.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            heading.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
 
-            cardHost.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 10),
-            cardHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            cardHost.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
-            cardHost.widthAnchor.constraint(lessThanOrEqualToConstant: 640),
+            row.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 12),
+            row.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            row.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
         ])
 
         cancellable = settings.$theme

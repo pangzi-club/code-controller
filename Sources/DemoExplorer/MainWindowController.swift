@@ -1,23 +1,17 @@
 import AppKit
 import Combine
 
-/// What the detail pane currently shows: a sidebar folder or the settings page.
-enum SidebarSelection: Hashable {
-    case folder(UUID)
-    case settings
-}
-
-/// Owns the main window: a unified toolbar carrying the sidebar toggle plus
-/// contextual folder actions, a white sidebar pane and a detail pane swapped
-/// on selection, window-title updates, and manual frame persistence.
+/// Owns the main window: a unified toolbar carrying the sidebar toggle, a
+/// white sidebar pane and a detail pane swapped on selection, window-title
+/// updates, the ⌘O forwarding target, and manual frame persistence.
 @MainActor
-final class MainWindowController: NSWindowController, NSWindowDelegate {
+final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     private let settings: SettingsStore
     private let folders: FolderStore
     private let sidebar: SidebarViewController
     private let detail = DetailContainerViewController()
     private let toolbar = NSToolbar(identifier: "MainWindowToolbar")
-    private var selection: SidebarSelection?
+    private var selectedFolderID: UUID?
     private var foldersCancellable: AnyCancellable?
 
     init(settings: SettingsStore, folders: FolderStore) {
@@ -75,13 +69,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         window.delegate = self
 
-        sidebar.onSelect = { [weak self] selection in self?.select(selection) }
+        sidebar.onSelect = { [weak self] folderID in self?.select(folderID) }
         // A removed folder must leave the detail pane.
         foldersCancellable = folders.foldersPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.validateSelection() }
 
-        selection = folders.folders.first.map { .folder($0.id) }
+        selectedFolderID = folders.folders.first?.id
         updateDetail()
     }
 
@@ -90,41 +84,30 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Selection
 
-    func select(_ selection: SidebarSelection?) {
-        guard selection != self.selection else { return }
-        self.selection = selection
-        sidebar.reflectSelection(selection)
+    func select(_ folderID: UUID?) {
+        guard folderID != selectedFolderID else { return }
+        selectedFolderID = folderID
+        sidebar.reflectSelection(folderID)
         updateDetail()
-    }
-
-    func selectSettings() {
-        select(.settings)
     }
 
     func addFolderAndSelect() {
         guard let url = FolderPicker.chooseFolder(), let folder = folders.add(url) else { return }
-        select(.folder(folder.id))
+        select(folder.id)
     }
 
     private func validateSelection() {
-        guard case .folder(let id)? = selection,
+        guard let id = selectedFolderID,
               !folders.folders.contains(where: { $0.id == id }) else { return }
         select(nil)
     }
 
     private func updateDetail() {
-        switch selection {
-        case .settings:
-            detail.show(SettingsViewController(settings: settings))
-            window?.title = l10n("Settings")
-        case .folder(let id):
-            if let folder = folders.folders.first(where: { $0.id == id }) {
-                detail.show(FileListViewController(folder: folder))
-                window?.title = folder.name
-            } else {
-                showPlaceholder()
-            }
-        case nil:
+        if let id = selectedFolderID,
+           let folder = folders.folders.first(where: { $0.id == id }) {
+            detail.show(FileListViewController(folder: folder))
+            window?.title = folder.name
+        } else {
             showPlaceholder()
         }
     }
@@ -136,10 +119,26 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.title = AppInfo.displayName
     }
 
+    // MARK: File menu (⌘O)
+
+    /// The responder-chain target for File → Open: menu items dispatch through
+    /// the first responder, which may sit in the sidebar branch, so this
+    /// (reachable as the window delegate) forwards to the visible file list.
+    @objc func openSelectedFile(_ sender: Any?) {
+        (detail.current as? FileListViewController)?.openSelection()
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(openSelectedFile(_:)) {
+            return (detail.current as? FileListViewController)?.hasSelection ?? false
+        }
+        return true
+    }
+
     // MARK: Toolbar
 
-    // The toolbar is static: just the sidebar toggle (folder reveal/refresh
-    // live in row context menus). The window title renders inline next to it.
+    // The toolbar is static: just the sidebar toggle (reveal/refresh live in
+    // row context menus). The window title renders inline next to it.
 
     // MARK: Frame persistence (NSWindowDelegate)
 
@@ -192,7 +191,7 @@ extension MainWindowController: NSToolbarDelegate {
 /// Swaps the detail pane's child view controller, pinning its view edge to edge.
 @MainActor
 final class DetailContainerViewController: NSViewController {
-    private var current: NSViewController?
+    private(set) var current: NSViewController?
 
     override func loadView() {
         view = BackgroundColorView(backgroundColor: .controlBackgroundColor, topHairline: true)
@@ -219,7 +218,7 @@ final class DetailContainerViewController: NSViewController {
     }
 }
 
-/// Empty-state page shown while no sidebar entry is selected.
+/// Empty-state page shown while no folder is selected.
 @MainActor
 final class PlaceholderViewController: NSViewController {
     private let hasFolders: Bool

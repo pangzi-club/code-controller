@@ -33,3 +33,12 @@
 "Window" = "Window";
 "Minimize" = "Minimize";
 "Zoom" = "Zoom";
+"Bring All to Front" = "Bring All to Front";
+"Help" = "Help";
+"%@ Help" = "%@ Help";
+"Undo" = "Undo";
+"Redo" = "Redo";
+"Hide Others" = "Hide Others";
+"Show All" = "Show All";
+"Services" = "Services";
+"Emoji & Symbols" = "Emoji & Symbols";

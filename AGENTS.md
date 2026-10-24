@@ -49,19 +49,30 @@ relies on. AppKit has no Xcode Previews — verify UI changes with `make dev`.
 - **State** lives in `ObservableObject` stores (`SettingsStore`, `FolderStore`)
   persisted to UserDefaults and passed by hand (no environment objects in
   AppKit — wire updates with Combine `sink`s and target/action). The theme is
-  applied app-wide by setting `NSApp.appearance` from `AppDelegate`. The main
-  window frame persists through `MainWindowController`'s `NSWindowDelegate`
-  callbacks — manual save/restore under the fixed UserDefaults key
-  `mainWindowFrame`, bypassing NSWindow autosave so `swift run` and the .app
-  behave identically. The pure logic in `WindowFramePersistence` (parse /
-  restorable / clamp / default / launch frame) has tests.
+  applied by setting `NSApp.appearance` **and** every window's `appearance`
+  explicitly — setting only `NSApp.appearance` at runtime does not propagate
+  to already-created windows (their chrome and custom-drawn views stay stale
+  until relaunch). The main window frame persists through
+  `MainWindowController`'s `NSWindowDelegate` callbacks — manual save/restore
+  under the fixed UserDefaults key `mainWindowFrame`, bypassing NSWindow
+  autosave so `swift run` and the .app behave identically. The pure logic in
+  `WindowFramePersistence` (parse / restorable / clamp / default / launch
+  frame) has tests.
+- **File lists watch their folder** with a `DispatchSourceFileSystemObject`
+  (`FileListViewController.startMonitoring`) and reload (selection-preserving)
+  on disk changes; the context menu keeps a manual Refresh as fallback.
+- **Settings is a separate window** (`SettingsWindowController`, ⌘,), owned
+  by `AppDelegate` — not a page inside the main window.
 - **Access control**: the executable target (`Sources/DemoExplorerApp/`) only
   instantiates `AppDelegate`, which is the single `public` type; everything
   else in `Sources/DemoExplorer/` stays internal and is tested via
   `@testable`.
 - **The menu bar is built in code** in `AppDelegate.buildMainMenu()` — there is
   no MainMenu.xib because SwiftPM can't ship one. New menu items must use
-  `l10n()` titles and add their keys to both `.strings` files.
+  `l10n()` titles and add their keys to both `.strings` files. Actions that
+  depend on the file list's selection (⌘O) target `MainWindowController`
+  explicitly: a nil target's validation stalls at the first responder (the
+  table), which does not implement the action.
 - **The main window's unified toolbar is managed by `MainWindowController`**
   (`NSToolbarDelegate`) and holds only the sidebar toggle (⌥⌘S resolves to the
   split view controller's `toggleSidebar`, which collapses the sidebar item).

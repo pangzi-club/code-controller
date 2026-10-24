@@ -33,3 +33,12 @@
 "Window" = "窗口";
 "Minimize" = "最小化";
 "Zoom" = "缩放";
+"Bring All to Front" = "全部置于前";
+"Help" = "帮助";
+"%@ Help" = "%@ 帮助";
+"Undo" = "撤销";
+"Redo" = "重做";
+"Hide Others" = "隐藏其他";
+"Show All" = "显示全部";
+"Services" = "服务";
+"Emoji & Symbols" = "表情与符号";

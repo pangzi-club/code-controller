@@ -5,7 +5,7 @@ import Combine
 /// intake, the Add / Settings footer buttons, and per-row context menus.
 @MainActor
 final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
-    var onSelect: ((SidebarSelection?) -> Void)?
+    var onSelect: ((UUID?) -> Void)?
 
     private let folders: FolderStore
     private var foldersCancellable: AnyCancellable?
@@ -72,8 +72,8 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
     // MARK: Callbacks from MainWindowController
 
     /// Updates the highlighted row without notifying `onSelect` back.
-    func reflectSelection(_ selection: SidebarSelection?) {
-        selectedFolderID = if case .folder(let id)? = selection { id } else { nil }
+    func reflectSelection(_ folderID: UUID?) {
+        selectedFolderID = folderID
         syncRowSelection()
     }
 
@@ -139,26 +139,9 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
             target: self,
             action: #selector(addClicked)
         )
-        let settingsButton = DashedButton(
-            symbol: "gearshape",
-            title: "",
-            target: self,
-            action: #selector(settingsClicked)
-        )
-        settingsButton.toolTip = l10n("Settings")
-
         addButton.setContentHuggingPriority(.init(1), for: .horizontal)
-        NSLayoutConstraint.activate([
-            addButton.heightAnchor.constraint(equalToConstant: 38),
-            settingsButton.widthAnchor.constraint(equalToConstant: 38),
-            settingsButton.heightAnchor.constraint(equalToConstant: 38),
-        ])
-
-        let stack = NSStackView(views: [addButton, settingsButton])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 8
-        return stack
+        addButton.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        return addButton
     }
 
     // MARK: Store changes
@@ -205,11 +188,7 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
 
     @objc private func addClicked() {
         guard let url = FolderPicker.chooseFolder(), let folder = folders.add(url) else { return }
-        onSelect?(.folder(folder.id))
-    }
-
-    @objc private func settingsClicked() {
-        onSelect?(.settings)
+        onSelect?(folder.id)
     }
 
     @objc private func revealClicked(_ sender: NSMenuItem) {
@@ -270,7 +249,7 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         if folders.folders.indices.contains(row) {
             let folder = folders.folders[row]
             selectedFolderID = folder.id
-            onSelect?(.folder(folder.id))
+            onSelect?(folder.id)
         } else {
             selectedFolderID = nil
             onSelect?(nil)
@@ -299,13 +278,15 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
             icon.centerYAnchor.constraint(equalTo: tile.centerYAnchor),
         ])
 
+        // No text colors baked in: NSTextField adapts label/secondary colors
+        // to the row's selection and emphasis state on its own (and must, or
+        // deselection leaves stale white text — see syncRowSelection).
         let name = singleLineLabel(
             folder.name,
             font: .systemFont(ofSize: 13, weight: isSelected ? .semibold : .medium)
         )
-        name.textColor = isSelected ? .white : .labelColor
         let path = singleLineLabel(folder.url.abbreviatedPath, font: .systemFont(ofSize: 10), middleTruncating: true)
-        path.textColor = isSelected ? NSColor.white.withAlphaComponent(0.7) : .secondaryLabelColor
+        path.textColor = .secondaryLabelColor
 
         let texts = NSStackView(views: [name, path])
         texts.orientation = .vertical
@@ -350,7 +331,7 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
     ) -> Bool {
         guard let url = firstDraggedURL(info), isDirectory(url) else { return false }
         guard let folder = folders.add(url) else { return false }
-        onSelect?(.folder(folder.id))
+        onSelect?(folder.id)
         return true
     }
 
@@ -395,7 +376,9 @@ final class SidebarRowView: NSTableRowView {
 
     override func drawBackground(in dirtyRect: NSRect) {
         if isSelected {
-            NSColor.controlAccentColor.setFill()
+            // Native emphasis: accent fill while the window is key, flat gray
+            // otherwise (cell text follows via its background style).
+            (isEmphasized ? NSColor.controlAccentColor : NSColor.unemphasizedSelectedContentBackgroundColor).setFill()
             NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
         } else if hovered {
             NSColor.labelColor.withAlphaComponent(0.05).setFill()

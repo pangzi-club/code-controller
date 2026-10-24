@@ -6,6 +6,10 @@ final class FileListViewController: NSViewController, NSTableViewDataSource, NST
     let folder: Folder
     private var items: [FileItem] = []
     private var loadFailed = false
+    /// Watches the folder for changes so the list stays current without a
+    /// manual refresh.
+    private var folderSource: DispatchSourceFileSystemObject?
+    private var reloadWorkItem: DispatchWorkItem?
 
     private let tableView = ContextMenuTableView()
     private let scrollView = NSScrollView()
@@ -61,6 +65,50 @@ final class FileListViewController: NSViewController, NSTableViewDataSource, NST
         ])
 
         reload()
+        startMonitoring()
+    }
+
+    deinit {
+        reloadWorkItem?.cancel()
+        folderSource?.cancel()
+    }
+
+    // MARK: Folder monitoring
+
+    /// Watches the folder on disk (directories report `.write` when their
+    /// contents change) and reloads the list when something happens. Falls
+    /// back to the context-menu Refresh if monitoring can't be established.
+    private func startMonitoring() {
+        let fd = open(folder.url.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .delete, .rename],
+            queue: .main
+        )
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            if source.data.contains(.delete) || source.data.contains(.rename) {
+                self.stopMonitoring()
+            }
+            self.scheduleReload()
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        folderSource = source
+    }
+
+    private func stopMonitoring() {
+        folderSource?.cancel()
+        folderSource = nil
+    }
+
+    /// Directory events arrive in bursts; coalesce them into one reload.
+    private func scheduleReload() {
+        reloadWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.reload() }
+        reloadWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
     // MARK: UI construction
@@ -74,14 +122,12 @@ final class FileListViewController: NSViewController, NSTableViewDataSource, NST
         tableView.rowHeight = 50
         tableView.intercellSpacing = .zero
         tableView.backgroundColor = .clear
-        // The SwiftUI original highlighted rows on hover only; clicking did
-        // not select, so the native selection highlight stays off.
-        tableView.selectionHighlightStyle = .none
         tableView.allowsMultipleSelection = false
         tableView.delegate = self
         tableView.dataSource = self
         tableView.target = self
         tableView.doubleAction = #selector(openSelection)
+        tableView.enterAction = { [weak self] in self?.openSelection() }
         tableView.rowMenuProvider = { [weak self] row in self?.menu(forItemAt: row) }
 
         scrollView.documentView = tableView
@@ -131,6 +177,9 @@ final class FileListViewController: NSViewController, NSTableViewDataSource, NST
     // MARK: Loading
 
     private func reload() {
+        let previousPath = tableView.selectedRow >= 0 && items.indices.contains(tableView.selectedRow)
+            ? items[tableView.selectedRow].url.path
+            : nil
         if let loaded = FileLoader.load(from: folder.url) {
             items = loaded
             loadFailed = false
@@ -139,6 +188,10 @@ final class FileListViewController: NSViewController, NSTableViewDataSource, NST
             loadFailed = true
         }
         tableView.reloadData()
+        // Keep the same file selected across content changes.
+        if let previousPath, let row = items.firstIndex(where: { $0.url.path == previousPath }) {
+            tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        }
         updateStates()
     }
 
@@ -152,10 +205,23 @@ final class FileListViewController: NSViewController, NSTableViewDataSource, NST
         emptyState.isHidden = loadFailed || !items.isEmpty
     }
 
-    @objc private func openSelection() {
+    // MARK: Opening
+
+    /// True when a row is selected; gates the ⌘O menu item.
+    var hasSelection: Bool {
+        items.indices.contains(tableView.selectedRow)
+    }
+
+    /// Opens the selected file with the default app (double-click, Return and
+    /// ⌘O all land here; also the MainWindowController forwarding target).
+    @objc func openSelection() {
         let row = tableView.selectedRow
         guard items.indices.contains(row) else { return }
         FileOpener.open(items[row].url)
+    }
+
+    @objc private func refreshClicked() {
+        reload()
     }
 
     private func menu(forItemAt row: Int) -> NSMenu? {
@@ -171,6 +237,10 @@ final class FileListViewController: NSViewController, NSTableViewDataSource, NST
         reveal.target = self
         reveal.representedObject = item.url
         menu.addItem(reveal)
+        menu.addItem(.separator())
+        let refresh = NSMenuItem(title: l10n("Refresh"), action: #selector(refreshClicked), keyEquivalent: "")
+        refresh.target = self
+        menu.addItem(refresh)
         return menu
     }
 
