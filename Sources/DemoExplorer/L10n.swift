@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 /// Resolves UI strings from the module's localization files.
 ///
@@ -30,16 +30,11 @@ enum L10n {
     }
 }
 
-/// Localized SwiftUI text; supports format arguments, e.g. `l10n("%lld items", count)`.
-func l10n(_ key: String, _ args: CVarArg...) -> Text {
+/// Localized string for every user-facing label, menu item or message;
+/// supports format arguments, e.g. `l10n("%lld items", count)`.
+func l10n(_ key: String, _ args: CVarArg...) -> String {
     if args.isEmpty {
-        Text(L10n.string(forKey: key))
-    } else {
-        Text(String(format: L10n.string(forKey: key), arguments: args))
+        return L10n.string(forKey: key)
     }
-}
-
-/// Localized plain string for non-SwiftUI contexts (e.g. NSPanel messages).
-func l10nString(_ key: String) -> String {
-    L10n.string(forKey: key)
+    return String(format: L10n.string(forKey: key), arguments: args)
 }

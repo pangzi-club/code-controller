@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import DemoExplorer
 
+// Serialized: the tests share the `folderPaths` UserDefaults key.
+@Suite(.serialized)
 @MainActor
 struct FolderStoreTests {
     private func makeTempFolder() -> URL {

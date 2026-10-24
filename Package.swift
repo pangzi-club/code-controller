@@ -8,9 +8,8 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
-        // The library carries all app code; the executable below is a thin
-        // @main wrapper. This split is what makes Xcode Previews work —
-        // previews need a library product, not a command-line tool.
+        // The library carries all app code so the test target can import it;
+        // the executable below is a thin @main wrapper.
         .library(name: "DemoExplorer", targets: ["DemoExplorer"]),
     ],
     targets: [

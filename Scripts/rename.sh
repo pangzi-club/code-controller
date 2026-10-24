@@ -1,6 +1,6 @@
 #!/bin/bash
 # Renames the app template in one shot: package/target names in Package.swift,
-# the Sources/ and Tests/ directories, the @main struct file, the identity in
+# the Sources/ and Tests/ directories, the @main entry file, the identity in
 # AppInfo.swift, and every mention in the READMEs and AGENTS.md.
 #
 # Usage:
@@ -45,7 +45,7 @@ fi
 
 echo "==> Renaming $OLD -> $NEW (bundle ID: $BUNDLE_ID)"
 
-# --- Move directories and the @main struct file -------------------------------
+# --- Move directories and the @main entry file ----------------------------------
 # Library target directory
 git mv "Sources/$OLD" "Sources/$NEW"
 # Executable target directory

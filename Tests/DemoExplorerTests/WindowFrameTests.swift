@@ -2,6 +2,9 @@ import AppKit
 import Testing
 @testable import DemoExplorer
 
+// Serialized: the launchFrame tests read and write the shared
+// `mainWindowFrame` UserDefaults key, which parallel runs would clobber.
+@Suite(.serialized)
 struct WindowFrameTests {
     let screen = NSRect(x: 0, y: 0, width: 1920, height: 1080)
     let sideScreen = NSRect(x: 1920, y: 0, width: 1280, height: 800)
@@ -100,5 +103,34 @@ struct WindowFrameTests {
         #expect(frame.height == tiny.height)
         #expect(frame.midX == tiny.midX)
         #expect(frame.midY == tiny.midY)
+    }
+
+    @Test("launchFrame returns the clamped saved frame when usable")
+    func launchFrameUsesSaved() {
+        let saved = NSRect(x: -300, y: 100, width: 1080, height: 720)
+        UserDefaults.standard.set(NSStringFromRect(saved), forKey: WindowFramePersistence.frameKey)
+        defer { UserDefaults.standard.removeObject(forKey: WindowFramePersistence.frameKey) }
+
+        let frame = WindowFramePersistence.launchFrame(defaultScreen: screen, screens: screens)
+
+        #expect(frame == WindowFramePersistence.clamped(saved, to: screens))
+    }
+
+    @Test("launchFrame falls back to the centered default when nothing usable is stored")
+    func launchFrameFallsBack() {
+        func fallbackFrame() -> NSRect {
+            WindowFramePersistence.launchFrame(defaultScreen: screen, screens: screens)
+        }
+
+        UserDefaults.standard.removeObject(forKey: WindowFramePersistence.frameKey)
+        #expect(fallbackFrame() == WindowFramePersistence.defaultFrame(in: screen))
+
+        // Saved on a display that no longer exists.
+        UserDefaults.standard.set(
+            NSStringFromRect(NSRect(x: -5000, y: -5000, width: 1080, height: 720)),
+            forKey: WindowFramePersistence.frameKey
+        )
+        defer { UserDefaults.standard.removeObject(forKey: WindowFramePersistence.frameKey) }
+        #expect(fallbackFrame() == WindowFramePersistence.defaultFrame(in: screen))
     }
 }

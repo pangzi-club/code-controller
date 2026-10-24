@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// A folder shown in the sidebar.
@@ -16,6 +17,10 @@ final class FolderStore: ObservableObject {
     }
 
     private static let storageKey = "folderPaths"
+
+    /// `$folders` follows the property's private setter; this exposes the
+    /// values to observers outside the type.
+    var foldersPublisher: AnyPublisher<[Folder], Never> { $folders.eraseToAnyPublisher() }
 
     init() {
         let paths = UserDefaults.standard.stringArray(forKey: Self.storageKey) ?? []
