@@ -58,16 +58,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildMainMenu(mainWindow: MainWindowController) {
         let mainMenu = NSMenu()
 
-        for menu in [appMenu(), fileMenu(mainWindow: mainWindow), editMenu(), viewMenu(), windowMenu()] {
-            let item = NSMenuItem()
-            item.submenu = menu
+        let appItem = NSMenuItem(); appItem.submenu = appMenu()
+        let fileItem = NSMenuItem(); fileItem.submenu = fileMenu(mainWindow: mainWindow)
+        let editItem = NSMenuItem(); editItem.submenu = editMenu()
+        let viewItem = NSMenuItem(); viewItem.submenu = viewMenu()
+        let windowItem = NSMenuItem(); windowItem.submenu = windowMenu()
+
+        for item in [appItem, fileItem, editItem, viewItem, windowItem] {
             mainMenu.addItem(item)
         }
 
         NSApp.mainMenu = mainMenu
-        // Let the system manage these standard submenus' contents.
-        NSApp.windowsMenu = mainMenu.item(withTitle: l10n("Window"))?.submenu
-        NSApp.servicesMenu = mainMenu.item(withTitle: l10n("Services"))?.submenu
+        // Direct reference instead of title-based lookup: if a localization
+        // changes the menu title, item(withTitle:) returns nil and the system
+        // stops managing the window list.
+        NSApp.windowsMenu = windowItem.submenu
     }
 
     private func appMenu() -> NSMenu {
@@ -122,6 +127,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         let services = NSMenuItem(title: l10n("Services"), action: nil, keyEquivalent: "")
         services.submenu = NSMenu(title: l10n("Services"))  // populated via NSApp.servicesMenu
+        NSApp.servicesMenu = services.submenu
         menu.addItem(services)
         menu.addItem(.separator())
         menu.addItem(.item(
