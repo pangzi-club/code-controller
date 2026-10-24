@@ -9,83 +9,79 @@ let outputDir = CommandLine.arguments.count > 1
 let masterSize: CGFloat = 1024
 
 func masterIcon() -> NSImage {
-    let image = NSImage(size: NSSize(width: masterSize, height: masterSize))
-    image.lockFocus()
+    NSImage(size: NSSize(width: masterSize, height: masterSize), flipped: false) { rect in
+        guard let context = NSGraphicsContext.current?.cgContext else { return false }
 
-    guard let context = NSGraphicsContext.current?.cgContext else {
-        fatalError("no graphics context")
+        // Squircle tile: inset from canvas edges, corner radius ~22.5% of the tile.
+        let inset: CGFloat = masterSize * 0.0977
+        let tile = CGRect(x: inset, y: inset, width: masterSize - inset * 2, height: masterSize - inset * 2)
+        let tileRadius: CGFloat = tile.width * 0.225
+
+        let tilePath = NSBezierPath(roundedRect: tile, xRadius: tileRadius, yRadius: tileRadius)
+
+        // Diagonal gradient fill.
+        let colors = [NSColor(calibratedRed: 0.30, green: 0.52, blue: 1.00, alpha: 1).cgColor,
+                      NSColor(calibratedRed: 0.05, green: 0.72, blue: 0.86, alpha: 1).cgColor] as CFArray
+        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                  colors: colors,
+                                  locations: [0, 1])!
+        context.saveGState()
+        tilePath.addClip()
+        context.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: tile.minX, y: tile.maxY),
+            end: CGPoint(x: tile.maxX, y: tile.minY),
+            options: []
+        )
+
+        // Soft gloss along the top edge.
+        let gloss = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                               colors: [NSColor.white.withAlphaComponent(0.22).cgColor,
+                                        NSColor.white.withAlphaComponent(0).cgColor] as CFArray,
+                               locations: [0, 1])!
+        context.drawLinearGradient(
+            gloss,
+            start: CGPoint(x: 0, y: tile.maxY),
+            end: CGPoint(x: 0, y: tile.midY),
+            options: []
+        )
+        context.restoreGState()
+
+        // White folder glyph, centered.
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
+        shadow.shadowBlurRadius = 14
+        shadow.shadowOffset = NSSize(width: 0, height: -8)
+        shadow.set()
+
+        NSColor.white.setFill()
+        let bodyWidth: CGFloat = tile.width * 0.56
+        let bodyHeight: CGFloat = tile.height * 0.36
+        let bodyX = tile.midX - bodyWidth / 2
+        let bodyY = tile.midY - bodyHeight / 2 - tile.height * 0.02
+        let corner: CGFloat = bodyHeight * 0.16
+
+        // Tab sticking out above the body's top-left.
+        let tabHeight: CGFloat = bodyHeight * 0.22
+        let tabWidth: CGFloat = bodyWidth * 0.42
+        let tabPath = NSBezierPath(roundedRect: CGRect(
+            x: bodyX,
+            y: bodyY + bodyHeight - corner,
+            width: tabWidth,
+            height: tabHeight + corner
+        ), xRadius: corner, yRadius: corner)
+        tabPath.fill()
+
+        let bodyPath = NSBezierPath(roundedRect: CGRect(
+            x: bodyX,
+            y: bodyY,
+            width: bodyWidth,
+            height: bodyHeight
+        ), xRadius: corner, yRadius: corner)
+        bodyPath.fill()
+
+        return true
     }
-
-    // Squircle tile: inset from canvas edges, corner radius ~22.5% of the tile.
-    let inset: CGFloat = masterSize * 0.0977
-    let tile = CGRect(x: inset, y: inset, width: masterSize - inset * 2, height: masterSize - inset * 2)
-    let tileRadius: CGFloat = tile.width * 0.225
-
-    let tilePath = NSBezierPath(roundedRect: tile, xRadius: tileRadius, yRadius: tileRadius)
-
-    // Diagonal gradient fill.
-    let colors = [NSColor(calibratedRed: 0.30, green: 0.52, blue: 1.00, alpha: 1).cgColor,
-                  NSColor(calibratedRed: 0.05, green: 0.72, blue: 0.86, alpha: 1).cgColor] as CFArray
-    let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                              colors: colors,
-                              locations: [0, 1])!
-    context.saveGState()
-    tilePath.addClip()
-    context.drawLinearGradient(
-        gradient,
-        start: CGPoint(x: tile.minX, y: tile.maxY),
-        end: CGPoint(x: tile.maxX, y: tile.minY),
-        options: []
-    )
-
-    // Soft gloss along the top edge.
-    let gloss = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                           colors: [NSColor.white.withAlphaComponent(0.22).cgColor,
-                                    NSColor.white.withAlphaComponent(0).cgColor] as CFArray,
-                           locations: [0, 1])!
-    context.drawLinearGradient(
-        gloss,
-        start: CGPoint(x: 0, y: tile.maxY),
-        end: CGPoint(x: 0, y: tile.midY),
-        options: []
-    )
-    context.restoreGState()
-
-    // White folder glyph, centered.
-    let shadow = NSShadow()
-    shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
-    shadow.shadowBlurRadius = 14
-    shadow.shadowOffset = NSSize(width: 0, height: -8)
-    shadow.set()
-
-    NSColor.white.setFill()
-    let bodyWidth: CGFloat = tile.width * 0.56
-    let bodyHeight: CGFloat = tile.height * 0.36
-    let bodyX = tile.midX - bodyWidth / 2
-    let bodyY = tile.midY - bodyHeight / 2 - tile.height * 0.02
-    let corner: CGFloat = bodyHeight * 0.16
-
-    // Tab sticking out above the body's top-left.
-    let tabHeight: CGFloat = bodyHeight * 0.22
-    let tabWidth: CGFloat = bodyWidth * 0.42
-    let tabPath = NSBezierPath(roundedRect: CGRect(
-        x: bodyX,
-        y: bodyY + bodyHeight - corner,
-        width: tabWidth,
-        height: tabHeight + corner
-    ), xRadius: corner, yRadius: corner)
-    tabPath.fill()
-
-    let bodyPath = NSBezierPath(roundedRect: CGRect(
-        x: bodyX,
-        y: bodyY,
-        width: bodyWidth,
-        height: bodyHeight
-    ), xRadius: corner, yRadius: corner)
-    bodyPath.fill()
-
-    image.unlockFocus()
-    return image
 }
 
 func writePNG(_ image: NSImage, px size: Int, to url: URL) {
