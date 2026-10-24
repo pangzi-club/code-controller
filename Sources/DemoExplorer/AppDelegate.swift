@@ -58,14 +58,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildMainMenu(mainWindow: MainWindowController) {
         let mainMenu = NSMenu()
 
-        for menu in [
-            appMenu(),
-            fileMenu(mainWindow: mainWindow),
-            editMenu(),
-            viewMenu(),
-            windowMenu(),
-            helpMenu(),
-        ] {
+        for menu in [appMenu(), fileMenu(mainWindow: mainWindow), editMenu(), viewMenu(), windowMenu()] {
             let item = NSMenuItem()
             item.submenu = menu
             mainMenu.addItem(item)
@@ -75,17 +68,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Let the system manage these standard submenus' contents.
         NSApp.windowsMenu = mainMenu.item(withTitle: l10n("Window"))?.submenu
         NSApp.servicesMenu = mainMenu.item(withTitle: l10n("Services"))?.submenu
-        NSApp.helpMenu = mainMenu.item(withTitle: l10n("Help"))?.submenu
     }
 
     private func appMenu() -> NSMenu {
-        let name = AppInfo.displayName
-        let menu = NSMenu(title: name)
-        menu.addItem(.item(l10n("About %@"), #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        let menu = NSMenu(title: AppInfo.displayName)
+        menu.addItem(.item(l10n("About"), #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
         menu.addItem(.separator())
         menu.addItem(.item(l10n("Settings") + "…", #selector(showSettings), keyEquivalent: ","))
         menu.addItem(.separator())
-        menu.addItem(.item(l10n("Hide %@"), #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+        menu.addItem(.item(l10n("Hide"), #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
         menu.addItem(.item(
             l10n("Hide Others"),
             #selector(NSApplication.hideOtherApplications(_:)),
@@ -94,7 +85,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ))
         menu.addItem(.item(l10n("Show All"), #selector(NSApplication.unhideAllApplications(_:))))
         menu.addItem(.separator())
-        menu.addItem(.item(l10n("Quit %@"), #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(.item(l10n("Quit"), #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
     }
 
@@ -161,12 +152,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.item(l10n("Zoom"), #selector(NSWindow.performZoom(_:))))
         menu.addItem(.separator())
         menu.addItem(.item(l10n("Bring All to Front"), #selector(NSApplication.arrangeInFront(_:))))
-        return menu
-    }
-
-    private func helpMenu() -> NSMenu {
-        let menu = NSMenu(title: l10n("Help"))
-        menu.addItem(.item(l10n("%@ Help"), #selector(NSApplication.showHelp(_:)), keyEquivalent: "?"))
         return menu
     }
 

@@ -18,9 +18,9 @@
 "System" = "跟随系统";
 "Light" = "浅色";
 "Dark" = "深色";
-"About %@" = "关于 %@";
-"Hide %@" = "隐藏 %@";
-"Quit %@" = "退出 %@";
+"About" = "关于";
+"Hide" = "隐藏";
+"Quit" = "退出";
 "File" = "文件";
 "Close" = "关闭";
 "Edit" = "编辑";
@@ -34,8 +34,6 @@
 "Minimize" = "最小化";
 "Zoom" = "缩放";
 "Bring All to Front" = "全部置于前";
-"Help" = "帮助";
-"%@ Help" = "%@ 帮助";
 "Undo" = "撤销";
 "Redo" = "重做";
 "Hide Others" = "隐藏其他";

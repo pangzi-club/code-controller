@@ -18,9 +18,9 @@
 "System" = "System";
 "Light" = "Light";
 "Dark" = "Dark";
-"About %@" = "About %@";
-"Hide %@" = "Hide %@";
-"Quit %@" = "Quit %@";
+"About" = "About";
+"Hide" = "Hide";
+"Quit" = "Quit";
 "File" = "File";
 "Close" = "Close";
 "Edit" = "Edit";
@@ -34,8 +34,6 @@
 "Minimize" = "Minimize";
 "Zoom" = "Zoom";
 "Bring All to Front" = "Bring All to Front";
-"Help" = "Help";
-"%@ Help" = "%@ Help";
 "Undo" = "Undo";
 "Redo" = "Redo";
 "Hide Others" = "Hide Others";
