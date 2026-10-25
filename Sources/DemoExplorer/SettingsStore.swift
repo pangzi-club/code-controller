@@ -1,8 +1,7 @@
-import AppKit
-import Foundation
+import SwiftUI
 
 /// User-selectable interface theme.
-enum ThemePreference: String, CaseIterable {
+public enum ThemePreference: String, CaseIterable {
     case system
     case light
     case dark
@@ -16,12 +15,12 @@ enum ThemePreference: String, CaseIterable {
         }
     }
 
-    /// The appearance applied to the whole app; nil follows the system setting.
-    var appearance: NSAppearance? {
+    /// The color scheme to apply; nil follows the system setting.
+    public var colorScheme: ColorScheme? {
         switch self {
         case .system: nil
-        case .light: NSAppearance(named: .aqua)
-        case .dark: NSAppearance(named: .darkAqua)
+        case .light: .light
+        case .dark: .dark
         }
     }
 }
@@ -49,8 +48,8 @@ enum LanguagePreference: String, CaseIterable {
 
 /// App-wide user settings, persisted to UserDefaults.
 @MainActor
-final class SettingsStore: ObservableObject {
-    @Published var theme: ThemePreference {
+public final class SettingsStore: ObservableObject {
+    @Published public var theme: ThemePreference {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey) }
     }
 
@@ -60,7 +59,7 @@ final class SettingsStore: ObservableObject {
 
     private static let themeKey = "theme"
 
-    init() {
+    public init() {
         theme = UserDefaults.standard.string(forKey: Self.themeKey)
             .flatMap(ThemePreference.init(rawValue:)) ?? .system
         language = UserDefaults.standard.string(forKey: LanguagePreference.defaultsKey)

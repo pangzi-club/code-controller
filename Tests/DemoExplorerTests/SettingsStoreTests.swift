@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import Testing
 @testable import DemoExplorer
 
@@ -32,11 +32,11 @@ struct SettingsStoreTests {
         #expect(SettingsStore().theme == .dark)
     }
 
-    @Test("every theme maps to the expected app appearance")
-    func appearanceMapping() {
-        #expect(ThemePreference.system.appearance == nil)
-        #expect(ThemePreference.light.appearance?.name == .aqua)
-        #expect(ThemePreference.dark.appearance?.name == .darkAqua)
+    @Test("every theme maps to the expected color scheme")
+    func colorSchemeMapping() {
+        #expect(ThemePreference.system.colorScheme == nil)
+        #expect(ThemePreference.light.colorScheme == .light)
+        #expect(ThemePreference.dark.colorScheme == .dark)
     }
 
     @Test("every theme round-trips through its raw value")

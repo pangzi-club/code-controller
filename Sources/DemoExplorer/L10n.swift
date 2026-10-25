@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// Resolves UI strings from the module's localization files.
 ///
@@ -25,8 +25,8 @@ enum L10n {
 
     /// The language the UI strings resolve for, fixed at launch: the Settings
     /// override if one is stored, otherwise the system language. Strings are
-    /// baked into views and menus when they are built, so a changed setting
-    /// takes effect on relaunch.
+    /// baked into views when they are built, so a changed setting takes
+    /// effect on relaunch.
     static let launchLanguage: LanguagePreference = {
         guard let stored = LanguagePreference(
             rawValue: UserDefaults.standard.string(forKey: LanguagePreference.defaultsKey) ?? ""
@@ -60,11 +60,16 @@ enum L10n {
     }
 }
 
-/// Localized string for every user-facing label, menu item or message;
-/// supports format arguments, e.g. `l10n("%lld items", count)`.
-func l10n(_ key: String, _ args: CVarArg...) -> String {
+/// Localized SwiftUI text; supports format arguments, e.g. `l10n("%lld items", count)`.
+func l10n(_ key: String, _ args: CVarArg...) -> Text {
     if args.isEmpty {
-        return L10n.string(forKey: key)
+        Text(L10n.string(forKey: key))
+    } else {
+        Text(String(format: L10n.string(forKey: key), arguments: args))
     }
-    return String(format: L10n.string(forKey: key), arguments: args)
+}
+
+/// Localized plain string for non-SwiftUI contexts (e.g. NSPanel messages).
+func l10nString(_ key: String) -> String {
+    L10n.string(forKey: key)
 }

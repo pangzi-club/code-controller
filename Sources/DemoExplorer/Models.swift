@@ -59,7 +59,7 @@ enum FolderPicker {
     @MainActor
     static func chooseFolder() -> URL? {
         let panel = NSOpenPanel()
-        panel.message = l10n("Choose a folder")
+        panel.message = l10nString("Choose a folder")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false

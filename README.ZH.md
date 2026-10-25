@@ -2,16 +2,16 @@
 
 [English](README.md) | [中文](README.ZH.md)
 
-一个基于 AppKit 和 SwiftPM 的 macOS 桌面应用模板，以一个简单的文件浏览器作为示例 —— 无需 Xcode 工程文件，也没有 nib，所有窗口、菜单和视图全部用代码构建。包内拆分为 library（全部应用代码）和只含 `@main` 的薄 executable，测试 target 因此可以通过 `@testable` 导入全部代码。
+一个基于 SwiftUI 和 SwiftPM 的 macOS 桌面应用模板，以一个简单的文件浏览器作为示例 —— 无需 Xcode 工程文件。包内拆分为 library（全部应用代码）和只含 `@main` 的薄 executable，因此 Xcode Preview 开箱即用。
 
 ## 功能
 
-- **侧边栏**：文件夹列表，圆角强调色选中与悬停高亮；通过「添加文件夹」按钮或直接拖拽添加；右键可移除或在 Finder 中显示。每个文件夹根据路径分配一个稳定的彩色标识块。
-- **文件列表**：卡片式展示所选文件夹的直接子项（文件夹在前，再按名称排序），带系统图标、文件大小和修改时间。原生选中语义：单击选中、方向键导航、双击 / 回车 / ⌘O 打开；右键菜单提供「打开」和「在 Finder 中显示」。列表监听磁盘目录，内容变化时自动刷新并保留选中。
-- **设置窗口**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），持久化并全局生效，⌘, 打开——标准的 macOS 偏好设置窗口。
-- **菜单栏与工具栏**：菜单栏由 `AppDelegate` 用代码构建 —— 关于、设置、隐藏/隐藏其他/显示全部、退出，以及 File（打开 ⌘O）、Edit（撤销/重做/剪切/复制/粘贴/全选/服务/表情与符号）、View（切换侧边栏 ⌥⌘S）、Window、Help 菜单。窗口使用统一工具栏，含侧栏开关，文件夹名作为内嵌标题；无需 MainMenu.xib。
+- **侧边栏**：通过「添加文件夹」按钮或直接拖拽添加文件夹；右键可移除或在 Finder 中显示。每个文件夹根据路径分配一个稳定的彩色标识块。
+- **文件列表**：卡片式展示所选文件夹的直接子项（文件夹在前，再按名称排序），带系统图标、文件大小和修改时间，支持悬停高亮。
+- **打开文件**：双击用系统默认应用打开；右键菜单提供「打开」和「在 Finder 中显示」。
+- **设置页**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局。
 - **持久化**：文件夹列表存于 UserDefaults（失效路径会被自动过滤），窗口位置和大小跨启动保留。
-- **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）——包括所有菜单标题。
+- **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
 - 自动适配浅色 / 深色外观。
 
 ## 运行
@@ -32,9 +32,9 @@ swift test    # 或：make test
 
 项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make rename`（模板重命名）、`make clean`。运行 `make help` 查看全部。
 
-## Library / Executable 拆分
+## Xcode Preview
 
-包内有两个 target：**DemoExplorer** library 包含全部窗口控制器、视图控制器、模型和 store；**DemoExplorerApp** executable 只保留 `@main` 入口。这样拆分让测试 target 能 `@testable import DemoExplorer` 导入应用代码，也保持了 `Scripts/rename.sh` 依赖的 `Sources/<Library>` + `Sources/<Library>App` 目录结构。executable 只会用到 `AppDelegate` 一个类型，因此它也是唯一的 `public` 类型。
+用 Xcode 打开 `Package.swift`（scheme 由 Xcode 自动生成；`.swiftpm/` 已被 gitignore）。包内有两个 target：**DemoExplorer** library 包含全部视图、模型和 store；**DemoExplorerApp** executable 只保留 `@main` 入口。Preview 必须依赖 library 产物 —— 命令行工具类型的 target 无法驱动画布 —— 因此各视图文件末尾的 `#Preview` 都走 library scheme。executable target 要用到的类型需要标记 `public`。
 
 ## 作为模板使用
 
@@ -44,7 +44,7 @@ swift test    # 或：make test
 ./Scripts/rename.sh MyApp com.you.MyApp
 ```
 
-脚本会重命名 `Package.swift` 中的包和 target、移动 `Sources/` 与 `Tests/` 目录（executable target 会变成 `MyAppApp`）、重命名 `@main` 入口，并更新 `AppInfo.swift` 中的身份信息（未指定 bundle ID 时默认 `com.example.<NewName>`）、README 和 `AGENTS.md`。显示名之后可以在 `AppInfo.swift` 里随意调整（允许包含空格）。代码库的约定和已知坑都记录在 `AGENTS.md` 中。
+脚本会重命名 `Package.swift` 中的包和 target、移动 `Sources/` 与 `Tests/` 目录（executable target 会变成 `MyAppApp`）、重命名 `@main` 结构体，并更新 `AppInfo.swift` 中的身份信息（未指定 bundle ID 时默认 `com.example.<NewName>`）、README 和 `AGENTS.md`。显示名之后可以在 `AppInfo.swift` 里随意调整（允许包含空格）。代码库的约定和已知坑都记录在 `AGENTS.md` 中。
 
 ## 打包成 .app
 
@@ -61,34 +61,29 @@ open build/DemoExplorer.app
 
 ```
 Sources/
-├── DemoExplorer/                  # Library target：全部应用代码
-│   ├── AppInfo.swift              # 显示名 / bundle ID / 版本（唯一事实来源）
-│   ├── AppDelegate.swift          # NSApplicationDelegate：菜单栏、主题、启动
-│   ├── ContextMenuTableView.swift # 支持行右键菜单的 NSTableView 子类
-│   ├── FileListViewController.swift # 卡片式文件列表
-│   ├── FolderStore.swift          # 侧边栏文件夹列表 + 持久化
-│   ├── L10n.swift                 # 本地化辅助
-│   ├── MainWindowController.swift # 主窗口、分栏、详情页、窗口位置持久化
-│   ├── Models.swift               # 文件加载、打开/定位助手、文件夹选择器
-│   ├── SettingsStore.swift        # 主题 + 语言偏好与持久化
-│   ├── SettingsViewController.swift # 设置窗口内容（主题 + 语言切换）
-│   ├── SettingsWindowController.swift # ⌘, 设置窗口
-│   ├── SidebarViewController.swift  # 侧边栏表格、拖放、文件夹配色
-│   ├── StyleSupport.swift           # 背景/阴影/徽章/虚线按钮辅助
-│   ├── WindowFramePersistence.swift # 窗口位置手动保存/恢复（纯逻辑有测试）
+├── DemoExplorer/                 # Library target：全部视图、模型、store
+│   ├── AppInfo.swift             # 显示名 / bundle ID / 版本（唯一事实来源）
+│   ├── ContentView.swift         # 分栏布局、侧边栏、设置入口
+│   ├── FileListView.swift        # 卡片式文件列表
+│   ├── FolderStore.swift         # 侧边栏文件夹列表 + 持久化
+│   ├── Models.swift              # 文件加载、打开/定位助手、文件夹选择器
+│   ├── L10n.swift                # 本地化辅助
+│   ├── SettingsStore.swift       # 主题 + 语言偏好与持久化
+│   ├── SettingsView.swift        # 设置页（主题 + 语言切换）
+│   ├── WindowFrameAutosaver.swift # 窗口位置手动保存/恢复（纯逻辑有测试）
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
 │       └── zh-Hans.lproj/Localizable.strings
 └── DemoExplorerApp/
-    └── DemoExplorerApp.swift      # 薄 @main 入口
-Tests/DemoExplorerTests/           # Swift Testing 测试
+    └── DemoExplorerApp.swift     # 薄 @main 入口和窗口场景
+Tests/DemoExplorerTests/          # Swift Testing 测试
 Scripts/
-├── make-app.sh                    # release 构建 + .app 包组装
-├── make-icon.swift                # 应用图标程序化生成
-└── rename.sh                      # 一键模板重命名
-AGENTS.md                          # 面向人和 agent 的约定与坑位说明
+├── make-app.sh                   # release 构建 + .app 包组装
+├── make-icon.swift               # 应用图标程序化生成
+└── rename.sh                     # 一键模板重命名
+AGENTS.md                         # 面向人和 agent 的约定与坑位说明
 ```
 
 ## 本地化说明
 
-SwiftPM 构建时会把资源包里的 `.lproj` 目录名转成小写，而 `Bundle` 的资源名查找是大小写敏感的，导致系统语言偏好 `zh-Hans` 无法匹配到 `zh-hans.lproj`。`L10n` 自行根据设置中的语言覆盖项（如果有的话）和 `Locale.preferredLanguages` 判断语言，并显式加载对应的 `.lproj` 包来绕过这个问题。界面语言在启动时固定——字符串在视图和菜单构建时就已写入——所以修改语言设置后需要重启应用才能生效。
+SwiftPM 构建时会把资源包里的 `.lproj` 目录名转成小写，而 `Bundle` 的资源名查找是大小写敏感的，导致系统语言偏好 `zh-Hans` 无法匹配到 `zh-hans.lproj`。`L10n` 自行根据设置中的语言覆盖项（如果有的话）和 `Locale.preferredLanguages` 判断语言，并显式加载对应的 `.lproj` 包来绕过这个问题。界面语言在启动时固定——字符串在视图构建时就已写入——所以修改语言设置后需要重启应用才能生效。

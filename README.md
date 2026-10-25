@@ -2,19 +2,19 @@
 
 [English](README.md) | [中文](README.ZH.md)
 
-An AppKit + SwiftPM template for macOS desktop apps, demonstrated by a simple
-file browser — no Xcode project, no nibs. All windows, menus and views are
-built in code. The package splits into a library (all app code) and a thin
-`@main` executable, so the test target can import everything via `@testable`.
+A SwiftUI + SwiftPM template for macOS desktop apps, demonstrated by a simple
+file browser — no Xcode project needed. The package splits into a library
+(all app code) and a thin `@main` executable, so Xcode Previews work out of
+the box.
 
 ## Features
 
-- **Sidebar**: a folder table with rounded accent selection and hover highlight; add folders with the "Add Folder" button or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path.
-- **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Native selection semantics: click to select, arrow keys to navigate, double-click / Return / ⌘O to open; the context menu offers "Open" and "Show in Finder". The list watches the folder on disk and refreshes itself (keeping the selection) when its contents change.
-- **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide, opened with ⌘, like a proper macOS preferences window.
-- **Menu bar & toolbar**: the menu bar is built programmatically in `AppDelegate` — About, Settings, Hide/Hide Others/Show All, Quit, plus File (Open ⌘O), Edit (Undo/Redo/Cut/Copy/Paste/Select All/Services/Emoji & Symbols), View (Toggle Sidebar ⌥⌘S), Window and Help. The window shows a unified toolbar with the sidebar toggle and the folder name as the inline title; no MainMenu.xib is needed.
+- **Sidebar**: add folders with the "Add Folder" button or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path.
+- **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Hover highlighting included.
+- **Opening files**: double-click a file to open it with the system default app; the context menu also offers "Open" and "Show in Finder".
+- **Settings page**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide.
 - **Persistence**: the folder list lives in UserDefaults (stale paths are dropped), and the window frame survives relaunches.
-- **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch) — including every menu title.
+- **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
 - Adapts to light and dark appearance.
 
 ## Running
@@ -39,15 +39,15 @@ run), `make test`, `make app` (assemble the .app), `make launch` (assemble +
 open), `make build`, `make rename` (template rename), `make clean`. Run
 `make help` to list them.
 
-## Library / Executable Split
+## Xcode Previews
 
-The package has two targets: the **DemoExplorer** library with all window
-controllers, view controllers, models and stores, and the **DemoExplorerApp**
-executable that only holds the `@main` entry point. The split keeps the app
-code importable by the test target (`@testable import DemoExplorer`) and keeps
-the `Sources/<Library>` + `Sources/<Library>App` layout `Scripts/rename.sh`
-relies on. The only type the executable touches is `AppDelegate`, which is
-therefore the only `public` type.
+Open `Package.swift` in Xcode (it synthesizes the schemes; `.swiftpm/` is
+gitignored). The package has two targets: the **DemoExplorer** library with
+all views, models and stores, and the **DemoExplorerApp** executable that only
+holds the `@main` entry point. Previews need a library product — a
+command-line-tool target cannot power the canvas — so the views (each file
+ends in a `#Preview` block) preview against the library scheme. Types used by
+the executable target must be `public`.
 
 ## Using This as a Template
 
@@ -59,11 +59,10 @@ To start a new app from this repository, rename everything in one shot:
 
 This renames the package and targets in `Package.swift`, moves `Sources/` and
 `Tests/` (the executable target becomes `MyAppApp`), renames the `@main`
-entry point, and updates the identity in `AppInfo.swift` (the bundle ID
-defaults to `com.example.<NewName>` when omitted), the READMEs and
-`AGENTS.md`. The display name can then be tuned freely in `AppInfo.swift` — it
-may contain spaces. `AGENTS.md` also documents the conventions and known
-gotchas of this codebase.
+struct, and updates the identity in `AppInfo.swift` (the bundle ID defaults to
+`com.example.<NewName>` when omitted), the READMEs and `AGENTS.md`. The display
+name can then be tuned freely in `AppInfo.swift` — it may contain spaces.
+`AGENTS.md` also documents the conventions and known gotchas of this codebase.
 
 ## Packaging as a .app
 
@@ -87,32 +86,27 @@ sessions won't carry over.
 
 ```
 Sources/
-├── DemoExplorer/                  # Library target: all app code
-│   ├── AppInfo.swift              # Display name / bundle ID / version (single source of truth)
-│   ├── AppDelegate.swift          # NSApplicationDelegate: menu bar, theme, launch
-│   ├── ContextMenuTableView.swift # NSTableView subclass with row context menus
-│   ├── FileListViewController.swift # Card-style file list
-│   ├── FolderStore.swift          # Sidebar folder list + persistence
-│   ├── L10n.swift                 # Localization helpers
-│   ├── MainWindowController.swift # Main window, split view, detail pane, frame persistence
-│   ├── Models.swift               # File loading, open/reveal helpers, folder picker
-│   ├── SettingsStore.swift        # Theme + language preferences and persistence
-│   ├── SettingsViewController.swift # Settings window content (theme + language pickers)
-│   ├── SettingsWindowController.swift # The ⌘, settings window
-│   ├── SidebarViewController.swift  # Sidebar table, drag-and-drop, folder colors
-│   ├── StyleSupport.swift           # Background/shadow/badge/dashed-button helpers
-│   ├── WindowFramePersistence.swift # Manual window frame save/restore (tested pure logic)
+├── DemoExplorer/                 # Library target: all views, models, stores
+│   ├── AppInfo.swift             # Display name / bundle ID / version (single source of truth)
+│   ├── ContentView.swift         # Split layout, sidebar, settings entry
+│   ├── FileListView.swift        # Card-style file list
+│   ├── FolderStore.swift         # Sidebar folder list + persistence
+│   ├── Models.swift              # File loading, open/reveal helpers, folder picker
+│   ├── L10n.swift                # Localization helpers
+│   ├── SettingsStore.swift       # Theme + language preferences and persistence
+│   ├── SettingsView.swift        # Settings page (theme + language pickers)
+│   ├── WindowFrameAutosaver.swift # Manual window frame save/restore (tested pure logic)
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
 │       └── zh-Hans.lproj/Localizable.strings
 └── DemoExplorerApp/
-    └── DemoExplorerApp.swift      # Thin @main entry point
-Tests/DemoExplorerTests/           # Swift Testing suite
+    └── DemoExplorerApp.swift     # Thin @main entry point and window scene
+Tests/DemoExplorerTests/          # Swift Testing suite
 Scripts/
-├── make-app.sh                    # Release build + .app bundle assembly
-├── make-icon.swift                # Programmatic app icon generator
-└── rename.sh                      # One-shot template rename
-AGENTS.md                          # Conventions and gotchas for humans and agents
+├── make-app.sh                   # Release build + .app bundle assembly
+├── make-icon.swift               # Programmatic app icon generator
+└── rename.sh                     # One-shot template rename
+AGENTS.md                         # Conventions and gotchas for humans and agents
 ```
 
 ## Localization Notes
@@ -123,5 +117,5 @@ miss `zh-hans.lproj` for a `zh-Hans` user preference. `L10n` resolves the
 language against the Settings override (if one is stored) and
 `Locale.preferredLanguages`, and loads the matching `.lproj` bundle explicitly
 to work around this. The language is fixed at launch — strings are baked into
-views and menus when they are built — so a changed setting asks to be
-relaunched before it applies.
+views when they are built — so a changed setting asks to be relaunched before
+it applies.
