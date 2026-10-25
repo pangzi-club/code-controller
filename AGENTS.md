@@ -50,12 +50,15 @@ a library product, not a command-line tool.
   under the fixed UserDefaults key `mainWindowFrame`, bypassing NSWindow
   autosave so `swift run` and the .app behave identically. The pure logic in
   `WindowFramePersistence` (parse / restorable / clamp / default) has tests.
-- **Settings is a separate window**, not a page inside the main window: the
-  SwiftUI `Settings` scene (standard ⌘, preferences window — singleton,
-  non-resizable, auto-centered). The sidebar gear opens it through
-  `SettingsWindowOpener`, which sends `showSettingsWindow:` down the
-  responder chain — undocumented but the only macOS 13 route; the public
-  `openSettings` environment action requires macOS 14.
+- **Settings is a separate window**, not a page inside the main window: a
+  single-instance `Window` scene (`id: "settings"`, fixed content size,
+  centered). The sidebar gear opens it via `@Environment(\.openWindow)`;
+  the ⌘, menu item (`CommandGroup(replacing: .appSettings)`) posts the
+  `openSettingsWindow` notification, which ContentView forwards to
+  `openWindow` — commands can't reach the environment action themselves.
+  Do NOT switch to a `Settings` scene: opening it programmatically is
+  macOS 14+ API, and its undocumented `showSettingsWindow:` selector was
+  verified to do nothing here.
 - **Access control**: the library target (`Sources/DemoExplorer/`) must mark
   types and members `public` when the executable target
   (`Sources/DemoExplorerApp/`) uses them. Protocol requirements (`body`,

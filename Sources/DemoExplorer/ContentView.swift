@@ -8,6 +8,7 @@ enum SidebarSelection: Hashable {
 public struct ContentView: View {
     @StateObject private var store = FolderStore()
     @State private var selection: SidebarSelection?
+    @Environment(\.openWindow) private var openWindow
 
     public init() {}
 
@@ -28,6 +29,9 @@ public struct ContentView: View {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettingsWindow)) { _ in
+            openWindow(id: "settings")
         }
     }
 
@@ -95,6 +99,7 @@ private struct PlaceholderView: View {
 private struct SidebarView: View {
     @ObservedObject var store: FolderStore
     @Binding var selection: SidebarSelection?
+    @Environment(\.openWindow) private var openWindow
 
     @State private var hoveredFolderID: UUID?
     @State private var addHovered = false
@@ -228,7 +233,7 @@ private struct SidebarView: View {
 
     private var settingsButton: some View {
         Button {
-            SettingsWindowOpener.open()
+            openWindow(id: "settings")
         } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: 13, weight: .medium))

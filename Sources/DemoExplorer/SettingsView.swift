@@ -83,16 +83,11 @@ public struct SettingsView: View {
     }
 }
 
-/// Opens the Settings scene's window from anywhere. The public
-/// `openSettings` environment action requires macOS 14; sending the action
-/// down the responder chain is the only macOS 13 route. The selector is
-/// undocumented but stable — the Settings scene has honored it since
-/// macOS 13.
-@MainActor
-enum SettingsWindowOpener {
-    static func open() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-    }
+/// Asks the running UI to open the settings window. Menu commands can't
+/// reach the `openWindow` environment action, so the ⌘, menu item posts
+/// this and the always-on-screen main window content forwards it.
+public extension Notification.Name {
+    static let openSettingsWindow = Notification.Name("openSettingsWindow")
 }
 
 #Preview {

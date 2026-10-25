@@ -69,7 +69,7 @@ func l10n(_ key: String, _ args: CVarArg...) -> Text {
     }
 }
 
-/// Localized plain string for non-SwiftUI contexts (e.g. NSPanel messages).
-func l10nString(_ key: String) -> String {
+/// Localized plain string for non-SwiftUI contexts (menus, window titles).
+public func l10nString(_ key: String) -> String {
     L10n.string(forKey: key)
 }
