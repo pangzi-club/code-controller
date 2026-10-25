@@ -21,6 +21,16 @@ struct DemoExplorerApp: App {
                 .background(TitlebarFlattener())
         }
         .windowToolbarStyle(.unified(showsTitle: true))
+
+        // The standard ⌘, preferences window: singleton, non-resizable,
+        // centered and sized to its content; the App menu gains a Settings…
+        // item with ⌘, when running as a real .app. The sidebar gear opens
+        // it via SettingsWindowOpener (which also covers bare `swift run`).
+        Settings {
+            SettingsView()
+                .environmentObject(settings)
+                .preferredColorScheme(settings.theme.colorScheme)
+        }
     }
 }
 

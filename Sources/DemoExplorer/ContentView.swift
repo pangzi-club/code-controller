@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// What the detail pane currently shows: a sidebar folder or the settings page.
+/// What the detail pane currently shows: the selected sidebar folder.
 enum SidebarSelection: Hashable {
     case folder(UUID)
-    case settings
 }
 
 public struct ContentView: View {
@@ -35,8 +34,6 @@ public struct ContentView: View {
     @ViewBuilder
     private var detailContent: some View {
         switch selection {
-        case .settings:
-            SettingsView()
         case .folder(let id):
             if let folder = store.folders.first(where: { $0.id == id }) {
                 FileListView(folder: folder)
@@ -230,18 +227,17 @@ private struct SidebarView: View {
     }
 
     private var settingsButton: some View {
-        let isActive = selection == .settings
-        return Button {
-            selection = .settings
+        Button {
+            SettingsWindowOpener.open()
         } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isActive ? .accentColor : settingsHovered ? .accentColor : .secondary)
+                .foregroundColor(settingsHovered ? .accentColor : .secondary)
                 .frame(width: 38, height: 38)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(
-                            Color.primary.opacity(settingsHovered || isActive ? 0.35 : 0.15),
+                            Color.primary.opacity(settingsHovered ? 0.35 : 0.15),
                             style: StrokeStyle(lineWidth: 1, dash: [5, 3])
                         )
                 )
@@ -320,7 +316,6 @@ extension URL {
 
 #Preview {
     ContentView()
-        .environmentObject(SettingsStore())
         .frame(width: 1080, height: 720)
         .toolbarBackground(Color(nsColor: .controlBackgroundColor), for: .windowToolbar)
 }

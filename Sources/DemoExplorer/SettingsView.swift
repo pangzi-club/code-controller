@@ -1,43 +1,35 @@
+import AppKit
 import SwiftUI
 
-/// Settings page: a General section with the theme picker and the interface
-/// language picker. Rows share one card so future sections stack below
+/// Settings window content: a General section with the theme picker and the
+/// interface language picker. Rows are pinned to the top edge with no card
+/// chrome — like a native settings pane — so future sections stack below
 /// without surgery.
-struct SettingsView: View {
+public struct SettingsView: View {
     @EnvironmentObject private var settings: SettingsStore
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                l10n("General")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.secondary)
-                generalCard
-                if needsRelaunch {
-                    l10n("Restart to apply the new language")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 20)
-            .frame(maxWidth: 640, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(maxHeight: .infinity, alignment: .top)
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-        .navigationTitle(l10n("Settings"))
-    }
+    public init() {}
 
-    private var generalCard: some View {
-        VStack(spacing: 0) {
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            l10n("General")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.secondary)
+
             themeRow
-            Divider()
-                .padding(.horizontal, 16)
             languageRow
+
+            if needsRelaunch {
+                l10n("Restart to apply the new language")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer(minLength: 0)
         }
-        .background(cardShape)
+        .padding(20)
+        .frame(width: 480, height: 320, alignment: .topLeading)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var themeRow: some View {
@@ -59,8 +51,6 @@ struct SettingsView: View {
             .labelsHidden()
             .frame(width: 240)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
     }
 
     private var languageRow: some View {
@@ -82,8 +72,6 @@ struct SettingsView: View {
             .labelsHidden()
             .frame(width: 160)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
     }
 
     /// L10n bakes the UI language at launch, so a change only applies on
@@ -93,20 +81,22 @@ struct SettingsView: View {
         let chosen = settings.language == .system ? L10n.systemLanguage : settings.language
         return chosen != L10n.launchLanguage
     }
+}
 
-    private var cardShape: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Color(nsColor: .controlBackgroundColor))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
+/// Opens the Settings scene's window from anywhere. The public
+/// `openSettings` environment action requires macOS 14; sending the action
+/// down the responder chain is the only macOS 13 route. The selector is
+/// undocumented but stable — the Settings scene has honored it since
+/// macOS 13.
+@MainActor
+enum SettingsWindowOpener {
+    static func open() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 }
 
 #Preview {
     SettingsView()
         .environmentObject(SettingsStore())
-        .frame(width: 640, height: 400)
+        .frame(width: 480, height: 320)
 }

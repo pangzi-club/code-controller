@@ -9,7 +9,7 @@
 - **侧边栏**：通过「添加文件夹」按钮或直接拖拽添加文件夹；右键可移除或在 Finder 中显示。每个文件夹根据路径分配一个稳定的彩色标识块。
 - **文件列表**：卡片式展示所选文件夹的直接子项（文件夹在前，再按名称排序），带系统图标、文件大小和修改时间，支持悬停高亮。
 - **打开文件**：双击用系统默认应用打开；右键菜单提供「打开」和「在 Finder 中显示」。
-- **设置页**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局。
+- **设置窗口**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局——标准的 ⌘, 偏好设置窗口（侧边栏齿轮同样可打开）。
 - **持久化**：文件夹列表存于 UserDefaults（失效路径会被自动过滤），窗口位置和大小跨启动保留。
 - **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
 - 自动适配浅色 / 深色外观。
@@ -63,13 +63,13 @@ open build/DemoExplorer.app
 Sources/
 ├── DemoExplorer/                 # Library target：全部视图、模型、store
 │   ├── AppInfo.swift             # 显示名 / bundle ID / 版本（唯一事实来源）
-│   ├── ContentView.swift         # 分栏布局、侧边栏、设置入口
+│   ├── ContentView.swift         # 分栏布局：侧边栏 + 详情页
 │   ├── FileListView.swift        # 卡片式文件列表
 │   ├── FolderStore.swift         # 侧边栏文件夹列表 + 持久化
 │   ├── Models.swift              # 文件加载、打开/定位助手、文件夹选择器
 │   ├── L10n.swift                # 本地化辅助
 │   ├── SettingsStore.swift       # 主题 + 语言偏好与持久化
-│   ├── SettingsView.swift        # 设置页（主题 + 语言切换）
+│   ├── SettingsView.swift        # 设置窗口内容（主题 + 语言切换）
 │   ├── WindowFrameAutosaver.swift # 窗口位置手动保存/恢复（纯逻辑有测试）
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings

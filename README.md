@@ -12,7 +12,7 @@ the box.
 - **Sidebar**: add folders with the "Add Folder" button or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path.
 - **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Hover highlighting included.
 - **Opening files**: double-click a file to open it with the system default app; the context menu also offers "Open" and "Show in Finder".
-- **Settings page**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide.
+- **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide — the standard ⌘, preferences window (also opened by the sidebar gear).
 - **Persistence**: the folder list lives in UserDefaults (stale paths are dropped), and the window frame survives relaunches.
 - **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
 - Adapts to light and dark appearance.
@@ -88,13 +88,13 @@ sessions won't carry over.
 Sources/
 ├── DemoExplorer/                 # Library target: all views, models, stores
 │   ├── AppInfo.swift             # Display name / bundle ID / version (single source of truth)
-│   ├── ContentView.swift         # Split layout, sidebar, settings entry
+│   ├── ContentView.swift         # Split layout with sidebar and detail pane
 │   ├── FileListView.swift        # Card-style file list
 │   ├── FolderStore.swift         # Sidebar folder list + persistence
 │   ├── Models.swift              # File loading, open/reveal helpers, folder picker
 │   ├── L10n.swift                # Localization helpers
 │   ├── SettingsStore.swift       # Theme + language preferences and persistence
-│   ├── SettingsView.swift        # Settings page (theme + language pickers)
+│   ├── SettingsView.swift        # Settings window content (theme + language pickers)
 │   ├── WindowFrameAutosaver.swift # Manual window frame save/restore (tested pure logic)
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
