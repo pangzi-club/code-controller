@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// What the detail pane currently shows: the selected sidebar folder.
@@ -8,12 +9,13 @@ enum SidebarSelection: Hashable {
 public struct ContentView: View {
     @StateObject private var store = FolderStore()
     @State private var selection: SidebarSelection?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.openWindow) private var openWindow
 
     public init() {}
 
     public var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: columnVisibilityBinding) {
             SidebarView(store: store, selection: $selection)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
@@ -29,6 +31,7 @@ public struct ContentView: View {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
             }
+            dropSidebarToggleFocus()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsWindow)) { _ in
             openWindow(id: "settings")
@@ -60,6 +63,30 @@ public struct ContentView: View {
         if let url = FolderPicker.chooseFolder(), let folder = store.add(url) {
             selection = .folder(folder.id)
         }
+    }
+
+    /// The toolbar sidebar toggle keeps keyboard focus — and with it a
+    /// permanent focus ring — once clicked (or once the window appears),
+    /// because nothing in the detail pane is focusable to take over. Hand
+    /// focus back to the window whenever the toggle is used.
+    private func dropSidebarToggleFocus() {
+        DispatchQueue.main.async {
+            let window = NSApp.keyWindow ?? NSApp.windows.first(where: \.isVisible)
+            window?.makeFirstResponder(nil)
+        }
+    }
+
+    /// Routes NavigationSplitView's column writes through a custom binding so
+    /// the focus drop above runs on every sidebar toggle, including the
+    /// ⌥⌘S shortcut.
+    private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { columnVisibility },
+            set: {
+                columnVisibility = $0
+                dropSidebarToggleFocus()
+            }
+        )
     }
 }
 

@@ -77,6 +77,11 @@ a library product, not a command-line tool.
   not replace it with `Bundle.localizedString` or `String(localized:)`. The
   UI language is fixed at launch (strings are baked into views when they are
   built), so the language setting applies on relaunch.
+- The **NavigationSplitView sidebar toggle keeps its focus ring** once it has
+  keyboard focus — clicked or from launch — and nothing in the detail pane is
+  focusable to take over, so the ring never clears by itself. ContentView
+  routes the split view's `columnVisibility` through a custom binding that
+  calls `makeFirstResponder(nil)` on every toggle, and once on appear.
 - UserDefaults live under the bundle ID, so state saved during `swift run`
   does not carry over to the .app (different domain), and vice versa.
 - After renaming the target or touching `Package.swift` heavily, stale
