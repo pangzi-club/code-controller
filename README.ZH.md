@@ -30,7 +30,11 @@ swift run
 swift test    # 或：make test
 ```
 
-项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make rename`（模板重命名）、`make clean`。运行 `make help` 查看全部。
+项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make rename`（模板重命名）、`make clean`。运行 `make help` 查看全部。
+
+## 验证 UI
+
+单元测试只覆盖纯逻辑。窗口帧恢复、设置窗口、焦点环、空状态、深色模式和本地化只存在于组装后的应用里 —— 务必用 `make app` 的产物验证，而不是裸 `swift run` 二进制。`docs/ui-testing.md` 是 AX + `screencapture` + CGEvent 的验证手册，包含辅助脚本源码和每次改动的检查清单。
 
 ## Xcode Preview
 
@@ -44,7 +48,7 @@ swift test    # 或：make test
 ./Scripts/rename.sh MyApp com.you.MyApp
 ```
 
-脚本会重命名 `Package.swift` 中的包和 target、移动 `Sources/` 与 `Tests/` 目录（executable target 会变成 `MyAppApp`）、重命名 `@main` 结构体，并更新 `AppInfo.swift` 中的身份信息（未指定 bundle ID 时默认 `com.example.<NewName>`）、README 和 `AGENTS.md`。显示名之后可以在 `AppInfo.swift` 里随意调整（允许包含空格）。代码库的约定和已知坑都记录在 `AGENTS.md` 中。
+脚本会重命名 `Package.swift` 中的包和 target、移动 `Sources/` 与 `Tests/` 目录（executable target 会变成 `MyAppApp`）、重命名 `@main` 结构体，并更新 `AppInfo.swift` 中的身份信息（未指定 bundle ID 时默认 `com.example.<NewName>`）、README、`AGENTS.md` 和 `docs/`。脚本结束时会列出仍包含旧名称的文件，避免后续新增的配置或脚本被静默遗漏。显示名之后可以在 `AppInfo.swift` 里随意调整（允许包含空格）。代码库的约定和已知坑都记录在 `AGENTS.md` 中。
 
 ## 打包成 .app
 
@@ -80,12 +84,15 @@ Sources/
     └── DemoExplorerApp.swift     # 薄 @main 入口和窗口场景
 Tests/DemoExplorerTests/          # Swift Testing 测试
 Scripts/
+├── check-l10n.py                 # 本地化键对齐校验
 ├── make-app.sh                   # release 构建 + .app 包组装
 ├── make-icon.swift               # 应用图标程序化生成
 └── rename.sh                     # 一键模板重命名
+docs/
+└── ui-testing.md                 # AX + screencapture + CGEvent 验证手册
 AGENTS.md                         # 面向人和 agent 的约定与坑位说明
 ```
 
 ## 本地化说明
 
-SwiftPM 构建时会把资源包里的 `.lproj` 目录名转成小写，而 `Bundle` 的资源名查找是大小写敏感的，导致系统语言偏好 `zh-Hans` 无法匹配到 `zh-hans.lproj`。`L10n` 自行根据设置中的语言覆盖项（如果有的话）和 `Locale.preferredLanguages` 判断语言，并显式加载对应的 `.lproj` 包来绕过这个问题。界面语言在启动时固定——字符串在视图构建时就已写入——所以修改语言设置后需要重启应用才能生效。
+SwiftPM 构建时会把资源包里的 `.lproj` 目录名转成小写，而 `Bundle` 的资源名查找是大小写敏感的，导致系统语言偏好 `zh-Hans` 无法匹配到 `zh-hans.lproj`。`L10n` 自行根据设置中的语言覆盖项（如果有的话）和 `Locale.preferredLanguages` 判断语言，并显式加载对应的 `en` 或 `zh-Hans` 的 `.lproj` 包 —— 使用多语言 module bundle 会跟随系统语言，忽略语言覆盖。界面语言在启动时固定 —— 字符串在视图构建时就已写入 —— 所以修改语言设置后需要重启应用才能生效。新增字符串后运行 `make check-l10n`，检查缺失或重复的键。

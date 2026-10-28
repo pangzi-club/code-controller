@@ -35,9 +35,17 @@ swift test    # or: make test
 ```
 
 There is also a `Makefile` with npm-scripts style shortcuts: `make dev` (debug
-run), `make test`, `make app` (assemble the .app), `make launch` (assemble +
-open), `make build`, `make rename` (template rename), `make clean`. Run
-`make help` to list them.
+run), `make test`, `make check-l10n` (verify localization key parity),
+`make app` (assemble the .app), `make launch` (assemble + open), `make build`,
+`make rename` (template rename), `make clean`. Run `make help` to list them.
+
+## Verifying the UI
+
+Unit tests cover pure logic. Window frame restoration, the settings window,
+focus rings, empty states, dark mode and localization only exist in the
+assembled app — always verify them on `make app` output, not the bare
+`swift run` binary. `docs/ui-testing.md` is the AX + `screencapture` + CGEvent
+playbook, including the helper sources and the per-change checklist.
 
 ## Xcode Previews
 
@@ -60,7 +68,9 @@ To start a new app from this repository, rename everything in one shot:
 This renames the package and targets in `Package.swift`, moves `Sources/` and
 `Tests/` (the executable target becomes `MyAppApp`), renames the `@main`
 struct, and updates the identity in `AppInfo.swift` (the bundle ID defaults to
-`com.example.<NewName>` when omitted), the READMEs and `AGENTS.md`. The display
+`com.example.<NewName>` when omitted), the READMEs, `AGENTS.md` and `docs/`.
+It finishes by listing any file that still contains the old name, so configs
+or scripts added later are visible instead of silently stale. The display
 name can then be tuned freely in `AppInfo.swift` — it may contain spaces.
 `AGENTS.md` also documents the conventions and known gotchas of this codebase.
 
@@ -111,9 +121,12 @@ Sources/
     └── DemoExplorerApp.swift     # Thin @main entry point and window scene
 Tests/DemoExplorerTests/          # Swift Testing suite
 Scripts/
+├── check-l10n.py                 # Localization key parity check
 ├── make-app.sh                   # Release build + .app bundle assembly
 ├── make-icon.swift               # Programmatic app icon generator
 └── rename.sh                     # One-shot template rename
+docs/
+└── ui-testing.md                 # AX + screencapture + CGEvent verification playbook
 AGENTS.md                         # Conventions and gotchas for humans and agents
 ```
 
@@ -123,7 +136,9 @@ SwiftPM lowercases `.lproj` directory names in the built resource bundle, and
 `Bundle` resource lookup is case-sensitive, so the stock CFBundle matching can
 miss `zh-hans.lproj` for a `zh-Hans` user preference. `L10n` resolves the
 language against the Settings override (if one is stored) and
-`Locale.preferredLanguages`, and loads the matching `.lproj` bundle explicitly
-to work around this. The language is fixed at launch — strings are baked into
-views when they are built — so a changed setting asks to be relaunched before
-it applies.
+`Locale.preferredLanguages`, and loads the matching `en` or `zh-Hans` `.lproj`
+bundle explicitly — the multi-localization module bundle would follow the
+system language and ignore the override. The language is fixed at launch —
+strings are baked into views when they are built — so a changed setting asks
+to be relaunched before it applies. Run `make check-l10n` after adding strings
+to catch missing or duplicate keys.
