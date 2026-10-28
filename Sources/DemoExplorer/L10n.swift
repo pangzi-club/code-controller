@@ -48,10 +48,21 @@ enum L10n {
         return nil
     }()
 
+    /// The explicit English bundle is needed for the English override: asking
+    /// the multi-localization module bundle would resolve the system language
+    /// instead of the chosen one.
+    private static let englishBundle: Bundle? = {
+        guard let path = Bundle.module.path(forResource: "en", ofType: "lproj") else {
+            return nil
+        }
+        return Bundle(path: path)
+    }()
+
     private static let stringsBundle: Bundle = {
         switch launchLanguage {
-        case .english, .system: return .module
+        case .english: return englishBundle ?? .module
         case .simplifiedChinese: return chineseBundle ?? .module
+        case .system: return .module
         }
     }()
 
