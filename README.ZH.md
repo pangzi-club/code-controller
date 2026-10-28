@@ -55,7 +55,9 @@ swift test    # 或：make test
 open build/DemoExplorer.app
 ```
 
-脚本会构建 release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）并做 ad-hoc 签名。应用身份统一定义在 `Sources/DemoExplorer/AppInfo.swift`：脚本从它读取显示名、bundle ID 和版本，target/二进制名则从 `Package.swift` 派生，没有任何重复定义。`.app` 的偏好设置存储在 bundle ID 名下，`swift run` 期间保存的文件夹不会自动带过去。
+脚本会构建 release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）并做 ad-hoc 签名。应用身份统一定义在 `Sources/DemoExplorer/AppInfo.swift`：脚本从它读取显示名、bundle ID 和版本，target/二进制名则从 `Package.swift` 派生，没有任何重复定义。`.app` 的偏好设置存储在 bundle ID 名下，`swift run` 期间保存的文件夹不会自动带过去。生成的 `Info.plist` 会声明 `CFBundleLocalizations`，让 AppKit 标准菜单跟随应用内语言。
+
+如果应用需要访问受保护文件夹，请在 `Scripts/make-app.sh` 的 Info.plist heredoc 中加入对应的 `NS*UsageDescription`，并提供 `Contents/Resources/<lang>.lproj/InfoPlist.strings` 本地化副本，让系统授权弹窗跟随用户语言。每次重新构建都会重新做 ad-hoc 签名，而签名身份是 macOS 关联 TCC 授权的依据——之前已允许的权限在重新构建后可能再次询问。
 
 ## 项目结构
 

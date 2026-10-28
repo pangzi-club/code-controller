@@ -80,7 +80,15 @@ bundle. App identity lives in `Sources/DemoExplorer/AppInfo.swift` — the scrip
 reads the display name, bundle ID and version from there, and derives the
 target/binary name from `Package.swift`, so nothing is duplicated. The .app
 stores preferences under its bundle ID, so folders saved during `swift run`
-sessions won't carry over.
+sessions won't carry over. `CFBundleLocalizations` is declared in the generated
+`Info.plist` so the standard AppKit menus follow the in-app language.
+
+If the app reads protected folders, add the matching `NS*UsageDescription` keys
+to the Info.plist heredoc in `Scripts/make-app.sh`, and localized copies in
+`Contents/Resources/<lang>.lproj/InfoPlist.strings` so the system prompt follows
+the user's language. Each rebuild re-signs the ad-hoc bundle, which changes the
+code identity macOS associates with TCC decisions — a fresh build may prompt
+again even if access was already granted.
 
 ## Project Layout
 
