@@ -143,6 +143,9 @@ lands; the first visible frame should already be the saved size.
 4. Click the toolbar sidebar toggle, then the detail pane: the toggle must not
    keep a blue focus ring after the sidebar changes. The same must hold right
    after launch.
+5. The sidebar must stay translucent all the way to the window's top edge,
+   with the traffic lights floating over it. Scroll the detail pane: content
+   must not show through the toolbar (the page-colored strip covers it).
 
 ## Appearance and localization
 

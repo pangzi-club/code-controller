@@ -128,18 +128,21 @@ of silently stale. The Makefile and `make-app.sh` discover `AppInfo.swift`
 via `Sources/*/AppInfo.swift`, so they keep working across renames. The bundle
 ID defaults to `com.example.<NewName>` when omitted.
 
-## Recipe: sidebar under the titlebar
+## Layout: sidebar under the titlebar
 
-The template ships an opaque toolbar; a sidebar that reaches the traffic
-lights needs four coordinated changes:
+The main window uses `fullSizeContentView` with a transparent titlebar, so the
+sidebar's native translucent material reaches the traffic lights. Keep these
+coordinated:
 
-- Set `fullSizeContentView` and `titlebarAppearsTransparent` on the window.
-- Hide the window toolbar background so the sidebar material reaches the
-  traffic lights; do not paint an opaque background over the sidebar.
-- `NavigationSplitView` adds its own top inset on top of the titlebar safe
-  area, so the sidebar ignores the top safe area and reserves the
-  traffic-light strip in its own content padding — otherwise the top spacing
-  doubles.
-- Overlay the page color on the detail column at the root's top safe-area
-  inset so scrolled content does not show through the toolbar controls.
-  Panels that start below the toolbar must not ignore the top safe area.
+- `TitlebarFlattener` sets `fullSizeContentView` and
+  `titlebarAppearsTransparent` on the window. Do not add an opaque toolbar
+  background on top of it.
+- `SidebarView` ignores the top safe area and reserves the traffic-light strip
+  in its header padding. `NavigationSplitView` would otherwise add its own top
+  inset on top of the titlebar safe area, doubling the spacing.
+- `ContentView` hides the window toolbar background and overlays the page color
+  on the detail column at the root's top safe-area inset, so scrolled content
+  does not show through the toolbar controls.
+- Never paint an opaque background over the sidebar — the translucent material
+  is the design. Panels that start below the toolbar must not ignore the top
+  safe area.

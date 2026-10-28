@@ -10,6 +10,7 @@ public struct ContentView: View {
     @StateObject private var store = FolderStore()
     @State private var selection: SidebarSelection?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var toolbarStripHeight: CGFloat = 52
     @Environment(\.openWindow) private var openWindow
 
     public init() {}
@@ -20,13 +21,28 @@ public struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             detailContent
+                .overlay(alignment: .top) {
+                    pageColor
+                        .frame(height: toolbarStripHeight)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .ignoresSafeArea(.container, edges: .top)
+                        .allowsHitTesting(false)
+                }
         }
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.08))
-                .frame(height: 1)
-                .ignoresSafeArea(edges: .horizontal)
-        }
+        .navigationSplitViewStyle(.balanced)
+        .background(pageColor)
+        .toolbarBackground(.hidden, for: .windowToolbar)
+        .background(
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        updateToolbarStrip(geometry.safeAreaInsets.top)
+                    }
+                    .onChange(of: geometry.safeAreaInsets.top) { height in
+                        updateToolbarStrip(height)
+                    }
+            }
+        )
         .onAppear {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
@@ -36,6 +52,19 @@ public struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsWindow)) { _ in
             openWindow(id: "settings")
         }
+    }
+
+    private var pageColor: Color {
+        Color(nsColor: .controlBackgroundColor)
+    }
+
+    /// Keeps the page-colored strip above the detail column in sync with the
+    /// window toolbar; the sidebar must stay transparent all the way to the
+    /// traffic lights, so the toolbar background itself is hidden.
+    private func updateToolbarStrip(_ height: CGFloat) {
+        let clamped = max(0, height)
+        guard abs(clamped - toolbarStripHeight) > 0.5 else { return }
+        toolbarStripHeight = clamped
     }
 
     @ViewBuilder
@@ -155,7 +184,7 @@ private struct SidebarView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 12)
+            .padding(.top, 44)
             .padding(.bottom, 8)
 
             if store.folders.isEmpty {
@@ -205,7 +234,12 @@ private struct SidebarView: View {
             }
             .padding(12)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        // The sidebar is drawn under the transparent titlebar; reserve the
+        // traffic-light strip in the header padding instead of letting
+        // NavigationSplitView add its own (doubled) top inset. No background is
+        // painted here: the split view's native translucent sidebar material
+        // shows the desktop through.
+        .ignoresSafeArea(.container, edges: .top)
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first else { return false }
             var isDirectory: ObjCBool = false
@@ -349,5 +383,5 @@ extension URL {
 #Preview {
     ContentView()
         .frame(width: 1080, height: 720)
-        .toolbarBackground(Color(nsColor: .controlBackgroundColor), for: .windowToolbar)
+        .background(Color(nsColor: .controlBackgroundColor))
 }

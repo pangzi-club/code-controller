@@ -9,7 +9,7 @@ the box.
 
 ## Features
 
-- **Sidebar**: add folders with the "Add Folder" button or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path.
+- **Sidebar**: add folders with the "Add Folder" button or by dragging them in; right-click to remove or reveal in Finder. Each folder gets a stable color tile derived from its path. The sidebar uses the native translucent material and extends under the transparent titlebar to the traffic lights.
 - **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Hover highlighting included.
 - **Opening files**: double-click a file to open it with the system default app; the context menu also offers "Open" and "Show in Finder".
 - **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide — a separate fixed-size window opened with ⌘, (App menu) or the sidebar gear.

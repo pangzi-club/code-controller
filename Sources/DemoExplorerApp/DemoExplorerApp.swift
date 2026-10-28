@@ -16,7 +16,6 @@ struct DemoExplorerApp: App {
                 // before the window is first shown, so ideal* only applies on
                 // the very first launch.
                 .frame(minWidth: 760, idealWidth: 1080, minHeight: 500, idealHeight: 720)
-                .toolbarBackground(Color(nsColor: .controlBackgroundColor), for: .windowToolbar)
                 .background(WindowFrameAutosaver.mainWindow)
                 .background(TitlebarFlattener())
         }
@@ -49,15 +48,16 @@ struct DemoExplorerApp: App {
     }
 }
 
-/// Matches the window background to the content, so the frame edges and
-/// overscroll areas stay white instead of the default gray. The hairline
-/// under the toolbar is drawn by ContentView's top overlay; the system
-/// separator is explicitly disabled so it can never double up with ours.
+/// Extends the content under the titlebar and makes the titlebar transparent,
+/// so the sidebar material reaches the traffic lights and the detail area shows
+/// the page color instead of a solid toolbar strip across the whole window.
 private struct TitlebarFlattener: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             guard let window = view.window else { return }
+            window.styleMask.insert(.fullSizeContentView)
+            window.titlebarAppearsTransparent = true
             window.backgroundColor = .controlBackgroundColor
             window.titlebarSeparatorStyle = .none
         }
