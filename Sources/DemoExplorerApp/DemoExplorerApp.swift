@@ -12,9 +12,9 @@ struct DemoExplorerApp: App {
                 .environmentObject(settings)
                 .preferredColorScheme(settings.theme.colorScheme)
                 // minWidth/minHeight bound user resizing; WindowFrameAutosaver
-                // applies the persisted frame (or the centered default) one
-                // tick after the window appears, so ideal* only sizes it for
-                // that first tick.
+                // restores the persisted frame (or the centered default)
+                // before the window is first shown, so ideal* only applies on
+                // the very first launch.
                 .frame(minWidth: 760, idealWidth: 1080, minHeight: 500, idealHeight: 720)
                 .toolbarBackground(Color(nsColor: .controlBackgroundColor), for: .windowToolbar)
                 .background(WindowFrameAutosaver.mainWindow)

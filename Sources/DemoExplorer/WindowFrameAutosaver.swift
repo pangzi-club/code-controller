@@ -82,10 +82,11 @@ enum WindowFramePersistence {
 /// mechanism: it depends on the system restore pipeline, which never fires for
 /// the unbundled `swift run` binary, and SwiftUI may override the name anyway.
 ///
-/// On attach, the saved frame (or a centered 1080×720 default) is applied;
-/// user-driven moves, resizes and closes write the frame back to UserDefaults.
-/// `swift run` and the .app therefore share one deterministic code path — each
-/// in its own UserDefaults domain, which is expected.
+/// On attach, the saved frame (or a centered 1080×720 default) is applied
+/// before the window is first shown; user-driven moves, resizes and closes
+/// write the frame back to UserDefaults. `swift run` and the .app therefore
+/// share one deterministic code path — each in its own UserDefaults domain,
+/// which is expected.
 public struct WindowFrameAutosaver: NSViewRepresentable {
     /// The instance to attach to the main window's content.
     public static let mainWindow = WindowFrameAutosaver()
@@ -97,18 +98,28 @@ public struct WindowFrameAutosaver: NSViewRepresentable {
     }
 
     public func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        // The view is attached to its window one run-loop tick after creation;
-        // by then SwiftUI has already assigned its derived autosave name.
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            Self.restore(window)
-            context.coordinator.observe(window)
+        let view = FrameRestoringView()
+        view.onWindow = { window in
+            Self.restoreBeforeFirstFrame(window, coordinator: context.coordinator)
         }
         return view
     }
 
     public func updateNSView(_ nsView: NSView, context: Context) {}
+
+    /// SwiftUI shows the window at its own default size before the next
+    /// run-loop turn, so a plain async restore makes the window visibly jump.
+    /// Instead, the window is hidden the moment the view attaches, the saved
+    /// frame is applied, and only then is it made visible again.
+    static func restoreBeforeFirstFrame(_ window: NSWindow, coordinator: Coordinator) {
+        let alpha = window.alphaValue
+        window.alphaValue = 0
+        DispatchQueue.main.async {
+            Self.restore(window)
+            coordinator.observe(window)
+            window.alphaValue = alpha
+        }
+    }
 
     /// Applies the saved frame, or the centered default when none is usable.
     static func restore(_ window: NSWindow) {
@@ -133,6 +144,7 @@ public struct WindowFrameAutosaver: NSViewRepresentable {
         /// Saves the frame whenever the user finishes moving or resizing the
         /// window, plus one last write on close.
         func observe(_ window: NSWindow) {
+            observers.forEach(NotificationCenter.default.removeObserver)
             let names = [
                 NSWindow.didMoveNotification,
                 NSWindow.didEndLiveResizeNotification,
@@ -154,5 +166,20 @@ public struct WindowFrameAutosaver: NSViewRepresentable {
         deinit {
             observers.forEach(NotificationCenter.default.removeObserver)
         }
+    }
+}
+
+/// Reports its window synchronously while SwiftUI is installing the content,
+/// i.e. before the window is ordered front — early enough to hide it for the
+/// frame restore without ever showing SwiftUI's default size.
+private final class FrameRestoringView: NSView {
+    var onWindow: ((NSWindow) -> Void)?
+    private weak var lastWindow: NSWindow?
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        guard let newWindow, newWindow !== lastWindow else { return }
+        lastWindow = newWindow
+        onWindow?(newWindow)
     }
 }
