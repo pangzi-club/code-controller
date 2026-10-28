@@ -1,7 +1,8 @@
 #!/bin/bash
 # Renames the app template in one shot: package/target names in Package.swift,
 # the Sources/ and Tests/ directories, the @main entry file, the identity in
-# AppInfo.swift, and every mention in the READMEs and AGENTS.md.
+# AppInfo.swift, and every mention in the READMEs, AGENTS.md and docs/.
+# Finishes by reporting any file that still contains the old name.
 #
 # Usage:
 #   ./Scripts/rename.sh <NewName> [com.example.newid]
@@ -63,6 +64,9 @@ fi
 for f in Package.swift README.md README.ZH.md AGENTS.md; do
     [[ -f "$f" ]] && sed -i '' "s/$OLD/$NEW/g" "$f"
 done
+if [[ -d docs ]]; then
+    find docs -type f -name '*.md' -exec sed -i '' "s/$OLD/$NEW/g" {} +
+fi
 ROOTS=(Sources)
 [[ -d Tests ]] && ROOTS+=(Tests)
 find "${ROOTS[@]}" -type f \( -name '*.swift' -o -name '*.strings' \) \
@@ -74,6 +78,19 @@ sed -i '' -E "s/^([[:space:]]*static let bundleID[[:space:]]*=[[:space:]]*)\"[^\
 
 # --- Stale build caches reference the old target name --------------------------
 rm -rf .build build
+
+# --- Verify no stale identity remains ------------------------------------------
+# Files added after the template was written (IDE configs, extra docs, scripts)
+# are not covered by the rewrites above; surface them instead of silently
+# leaving the old name behind.
+LEFTOVERS="$(find . \( -name .git -o -name .build -o -name build -o -name .swiftpm \) -prune \
+    -o -type f -exec grep -Il "$OLD" {} + || true)"
+if [[ -n "$LEFTOVERS" ]]; then
+    echo "warning: '$OLD' still appears in files not covered by this script:" >&2
+    while IFS= read -r file; do
+        echo "  $file" >&2
+    done <<< "$LEFTOVERS"
+fi
 
 echo "==> Done. Next:"
 echo "    make dev      # debug run"
