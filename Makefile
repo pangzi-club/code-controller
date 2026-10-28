@@ -10,7 +10,7 @@ APP_PATH := build/$(APP_DISPLAY_NAME).app
 .DEFAULT_GOAL := help
 
 help: ## List available commands
-	@awk -F ':.*## ' '/^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk -F ':.*## ' '/^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 dev: ## Debug build and run the app
 	swift run
@@ -20,6 +20,9 @@ build: ## Release build
 
 test: ## Run tests (Swift Testing + XCTest)
 	swift test
+
+check-l10n: ## Verify Localizable.strings key parity across languages
+	python3 Scripts/check-l10n.py
 
 app: ## Assemble the .app bundle
 	./Scripts/make-app.sh
@@ -36,4 +39,4 @@ clean: ## Remove build artifacts
 	swift package clean
 	rm -rf build/
 
-.PHONY: help dev build test app launch rename clean
+.PHONY: help dev build test check-l10n app launch rename clean
