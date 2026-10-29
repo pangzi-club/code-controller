@@ -68,7 +68,10 @@ a library product, not a command-line tool.
   `openWindow` — commands can't reach the environment action themselves.
   Do NOT switch to a `Settings` scene: opening it programmatically is
   macOS 14+ API, and its undocumented `showSettingsWindow:` selector was
-  verified to do nothing here.
+  verified to do nothing here. The window opts out of state restoration
+  (`window.isRestorable = false` in `SettingsWindowRestorationDisabler`),
+  because a plain `Window` scene would otherwise reopen at launch when it
+  was open at quit.
 - **Access control**: the library target (`Sources/DemoExplorer/`) must mark
   types and members `public` when the executable target
   (`Sources/DemoExplorerApp/`) uses them. Protocol requirements (`body`,

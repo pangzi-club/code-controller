@@ -30,6 +30,7 @@ public struct SettingsView: View {
         .padding(20)
         .frame(width: 480, height: 320, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(SettingsWindowRestorationDisabler())
     }
 
     private var themeRow: some View {
@@ -81,6 +82,20 @@ public struct SettingsView: View {
         let chosen = settings.language == .system ? L10n.systemLanguage : settings.language
         return chosen != L10n.launchLanguage
     }
+}
+
+/// A plain Window scene would otherwise be restored at launch like a
+/// document window; settings should only open on demand.
+private struct SettingsWindowRestorationDisabler: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            view.window?.isRestorable = false
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 /// Asks the running UI to open the settings window. Menu commands can't
