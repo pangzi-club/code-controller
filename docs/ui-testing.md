@@ -24,7 +24,7 @@ AppKit/SwiftUI surface.
   export APP_PATH="build/$APP_NAME.app"          # make app
   # Dev build from `make launch`:
   # export APP_BUNDLE_ID="$APP_BUNDLE_ID.dev"
-  # export APP_PATH="build/$APP_NAME Dev.app"
+  # export APP_PATH="build/$APP_NAME-Dev.app"
   export APP_PROCESS="$(ls build/*.app/Contents/MacOS | head -1)"
   ```
 

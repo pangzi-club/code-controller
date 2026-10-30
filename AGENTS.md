@@ -29,7 +29,7 @@ instead of a developer's home path.
 - `make mas` — assemble the sandboxed App Store build and
   `build/<Display Name>-<version>-<build>.pkg` (Apple Distribution;
   `PROVISION_PROFILE` embeds a TestFlight profile)
-- `make launch` — assemble and open `build/<Display Name> Dev.app` with bundle
+- `make launch` — assemble and open `build/<Display Name>-Dev.app` with bundle
   ID `<bundleID>.dev` and its own TCC grants and UserDefaults
 - `make rename NEW=MyApp ID=com.me.MyApp` — full template rename (see below)
 - `make template-diff SOURCE=/path/to/swiftui-starter` — show drift in
@@ -127,7 +127,7 @@ instead of a developer's home path.
   Update it whenever a new required-reason API appears; `make-app.sh` copies it
   to the app's top-level `Contents/Resources`.
 - **Dev builds use a separate identity**: `DEV=1` (what `make launch` runs)
-  appends `.dev` to the bundle ID and " Dev" to the display name. TCC grants
+  appends `.dev` to the bundle ID and `-Dev` to the display name. TCC grants
   and UserDefaults are keyed by bundle ID (and the sandbox container, when
   sandboxed), so the dev build keeps its own state instead of colliding with
   the shipping build. `DEV=1` and `MAS=1` are mutually exclusive.

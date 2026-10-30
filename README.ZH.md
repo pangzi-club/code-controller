@@ -72,14 +72,14 @@ swift test    # 或：make test
 
 ```bash
 make app                    # 产物：build/DemoExplorer.app
-make launch                 # 产物：build/DemoExplorer Dev.app，并打开
+make launch                 # 产物：build/DemoExplorer-Dev.app，并打开
 ```
 
 `make-app.sh` 会构建 universal（arm64 + x86_64）release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist，并复制隐私清单。`make app` 使用 `Scripts/App.entitlements` 签名，优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。本地和 Developer ID 构建**默认不开启沙盒**，需要本地或 hardened runtime 权限时往该文件里加。
 
 App Store 构建开启 App Sandbox，因此 demo 用 security-scoped bookmark 持久化文件夹，而不是只存路径——仅凭路径在重启后会失去访问权限。沙盒会把 Application Support、UserDefaults 和缓存移入 `~/Library/Containers/<bundleID>/Data`，所以 `swift run` 或 `make app` 期间保存的文件夹和偏好不会带到 App Store 构建。生成的 `Info.plist` 会声明 `CFBundleLocalizations`，让 AppKit 标准菜单跟随应用内语言。
 
-`make launch` 使用独立的开发身份：bundle ID 追加 `.dev`，显示名追加 ` Dev`。TCC 授权和 UserDefaults 都以 bundle ID 区分（开启沙盒时还包括容器），因此反复重建开发版不会让正式版的权限失效（反之亦然）。
+`make launch` 使用独立的开发身份：bundle ID 追加 `.dev`，显示名追加 `-Dev`。TCC 授权和 UserDefaults 都以 bundle ID 区分（开启沙盒时还包括容器），因此反复重建开发版不会让正式版的权限失效（反之亦然）。
 
 ### App Store
 

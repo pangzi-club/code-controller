@@ -105,7 +105,7 @@ Finder), assemble an app bundle:
 
 ```bash
 make app                    # build/DemoExplorer.app
-make launch                 # build/DemoExplorer Dev.app, opened
+make launch                 # build/DemoExplorer-Dev.app, opened
 ```
 
 `make-app.sh` builds a universal (arm64 + x86_64) release binary, generates the
@@ -126,7 +126,7 @@ during `swift run` or `make app` do not carry over to the App Store build.
 standard AppKit menus follow the in-app language.
 
 `make launch` builds a separate dev identity: the bundle ID gets a `.dev`
-suffix and the display name a ` Dev` suffix. TCC grants and UserDefaults are
+suffix and the display name a `-Dev` suffix. TCC grants and UserDefaults are
 keyed by bundle ID (and, when sandboxed, the container), so rebuilding the dev
 app does not invalidate the shipping app's permissions (and vice versa).
 

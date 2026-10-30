@@ -11,7 +11,7 @@
 #
 # Usage:
 #   ./Scripts/make-app.sh          # Developer ID (or ad-hoc) build, direct distribution
-#   DEV=1 ./Scripts/make-app.sh    # local dev build: .dev bundle ID + " Dev" name
+#   DEV=1 ./Scripts/make-app.sh    # local dev build: .dev bundle ID + "-Dev" name
 #   MAS=1 ./Scripts/make-app.sh    # App Store build + .pkg, sandboxed, Apple Distribution
 #
 # Environment overrides:
@@ -78,7 +78,7 @@ fi
 # shipping build (and, when sandboxed, a separate container).
 if [[ "$DEV" == "1" ]]; then
     EFFECTIVE_BUNDLE_ID="$BUNDLE_ID.dev"
-    EFFECTIVE_DISPLAY_NAME="$APP_DISPLAY_NAME Dev"
+    EFFECTIVE_DISPLAY_NAME="$APP_DISPLAY_NAME-Dev"
 else
     EFFECTIVE_BUNDLE_ID="$BUNDLE_ID"
     EFFECTIVE_DISPLAY_NAME="$APP_DISPLAY_NAME"

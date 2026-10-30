@@ -6,7 +6,7 @@
 APPINFO := $(firstword $(wildcard Sources/*/AppInfo.swift))
 APP_DISPLAY_NAME := $(shell sed -nE 's/^[[:space:]]*static let displayName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' $(APPINFO))
 APP_PATH := build/$(APP_DISPLAY_NAME).app
-DEV_APP_PATH := build/$(APP_DISPLAY_NAME) Dev.app
+DEV_APP_PATH := build/$(APP_DISPLAY_NAME)-Dev.app
 
 .DEFAULT_GOAL := help
 
