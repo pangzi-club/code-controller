@@ -50,3 +50,5 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
 - 2026-10-30 — diagnostics: `Log` writes unified logging plus a rotating file
   log, and `Log.bootstrap()` records the bundle, sandbox and log paths;
   `template-diff.sh` now matches files under a renamed library target.
+- 2026-10-30 — localization: `LocalizationTests` checks key parity, empty
+  values and every enum label key in `swift test`.

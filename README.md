@@ -193,4 +193,5 @@ bundle explicitly — the multi-localization module bundle would follow the
 system language and ignore the override. The language is fixed at launch —
 strings are baked into views when they are built — so a changed setting asks
 to be relaunched before it applies. Run `make check-l10n` after adding strings
-to catch missing or duplicate keys.
+to catch missing or duplicate keys; `swift test` also checks empty values and
+every enum label key.

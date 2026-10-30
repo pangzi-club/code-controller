@@ -70,6 +70,8 @@ a library product, not a command-line tool.
   when adding UserDefaults-touching tests, Swift Testing runs in parallel.
   File-system tests build their fixtures under
   `FileManager.temporaryDirectory`; never touch the real home directory.
+  `LocalizationTests` also checks key parity, empty values and every enum
+  label key, so a new label that is not in both catalogs fails `swift test`.
 - **State** lives in `ObservableObject` stores (`SettingsStore`, `FolderStore`)
   persisted to UserDefaults and injected via `.environmentObject`. The folder
   list stores app-scoped security bookmarks under `folderBookmarks` (not plain

@@ -128,4 +128,4 @@ AGENTS.md                         # 面向人和 agent 的约定与坑位说明
 
 ## 本地化说明
 
-SwiftPM 构建时会把资源包里的 `.lproj` 目录名转成小写，而 `Bundle` 的资源名查找是大小写敏感的，导致系统语言偏好 `zh-Hans` 无法匹配到 `zh-hans.lproj`。`L10n` 自行根据设置中的语言覆盖项（如果有的话）和 `Locale.preferredLanguages` 判断语言，并显式加载对应的 `en` 或 `zh-Hans` 的 `.lproj` 包 —— 使用多语言 module bundle 会跟随系统语言，忽略语言覆盖。界面语言在启动时固定 —— 字符串在视图构建时就已写入 —— 所以修改语言设置后需要重启应用才能生效。新增字符串后运行 `make check-l10n`，检查缺失或重复的键。
+SwiftPM 构建时会把资源包里的 `.lproj` 目录名转成小写，而 `Bundle` 的资源名查找是大小写敏感的，导致系统语言偏好 `zh-Hans` 无法匹配到 `zh-hans.lproj`。`L10n` 自行根据设置中的语言覆盖项（如果有的话）和 `Locale.preferredLanguages` 判断语言，并显式加载对应的 `en` 或 `zh-Hans` 的 `.lproj` 包 —— 使用多语言 module bundle 会跟随系统语言，忽略语言覆盖。界面语言在启动时固定 —— 字符串在视图构建时就已写入 —— 所以修改语言设置后需要重启应用才能生效。新增字符串后运行 `make check-l10n`，检查缺失或重复的键；`swift test` 还会检查空值和每个枚举 label 键。
