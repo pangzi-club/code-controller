@@ -10,7 +10,7 @@
 - **文件列表**：卡片式展示所选文件夹的直接子项（文件夹在前，再按名称排序），带系统图标、文件大小和修改时间，支持悬停高亮。
 - **打开文件**：双击用系统默认应用打开；右键菜单提供「打开」和「在 Finder 中显示」。
 - **设置窗口**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局——独立固定尺寸窗口，⌘,（App 菜单）或侧边栏齿轮均可打开。
-- **持久化**：文件夹列表存于 UserDefaults（失效路径会被自动过滤），窗口位置和大小跨启动保留。
+- **持久化**：文件夹列表以 security-scoped bookmark 的形式存于 UserDefaults（沙盒环境下重启仍可访问；失效文件夹会被过滤），窗口位置和大小跨启动保留。
 - **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
 - 自动适配浅色 / 深色外观。
 
@@ -30,7 +30,7 @@ swift run
 swift test    # 或：make test
 ```
 
-项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装 .app）、`make launch`（组装并打开）、`make build`、`make rename`（模板重命名）、`make clean`。运行 `make help` 查看全部。
+项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装分发用 .app）、`make launch`（组装并打开开发版）、`make mas`（App Store 安装包）、`make build`、`make rename`（模板重命名）、`make template-diff`（查看与模板的差异）、`make clean`。运行 `make help` 查看全部。
 
 ## 验证 UI
 
@@ -50,28 +50,43 @@ swift test    # 或：make test
 
 脚本会重命名 `Package.swift` 中的包和 target、移动 `Sources/` 与 `Tests/` 目录（executable target 会变成 `MyAppApp`）、重命名 `@main` 结构体，并更新 `AppInfo.swift` 中的身份信息（未指定 bundle ID 时默认 `com.example.<NewName>`）、README、`AGENTS.md` 和 `docs/`。脚本结束时会列出仍包含旧名称的文件，避免后续新增的配置或脚本被静默遗漏。显示名之后可以在 `AppInfo.swift` 里随意调整（允许包含空格）。代码库的约定和已知坑都记录在 `AGENTS.md` 中。
 
+`TEMPLATE.md` 记录模板版本和跟随上游的文件清单。在 fork 中运行
+`make template-diff SOURCE=/path/to/swiftui-starter` 即可查看差异；脚本只读，应用特有的改动可以手工合并。
+
 ## 打包成 .app
 
 想要完整体验（Dock 图标、菜单栏、Cmd+Tab、可在 Finder 中双击打开），需要组装应用包：
 
 ```bash
-./Scripts/make-app.sh          # 产物：build/DemoExplorer.app
-open build/DemoExplorer.app
+make app                    # 产物：build/DemoExplorer.app
+make launch                 # 产物：build/DemoExplorer Dev.app，并打开
 ```
 
-脚本会构建 release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）并做 ad-hoc 签名。应用身份统一定义在 `Sources/DemoExplorer/AppInfo.swift`：脚本从它读取显示名、bundle ID 和版本，target/二进制名则从 `Package.swift` 派生，没有任何重复定义。`.app` 的偏好设置存储在 bundle ID 名下，`swift run` 期间保存的文件夹不会自动带过去。生成的 `Info.plist` 会声明 `CFBundleLocalizations`，让 AppKit 标准菜单跟随应用内语言。
+`make-app.sh` 会构建 universal（arm64 + x86_64）release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist、复制隐私清单，并使用 `Scripts/App.entitlements` 签名。`make app` 优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。
 
-如果应用需要访问受保护文件夹，请在 `Scripts/make-app.sh` 的 Info.plist heredoc 中加入对应的 `NS*UsageDescription`，并提供 `Contents/Resources/<lang>.lproj/InfoPlist.strings` 本地化副本，让系统授权弹窗跟随用户语言。每次重新构建都会重新做 ad-hoc 签名，而签名身份是 macOS 关联 TCC 授权的依据——之前已允许的权限在重新构建后可能再次询问。
+应用默认开启 App Sandbox，因此 demo 用 security-scoped bookmark 持久化文件夹，而不是只存路径——仅凭路径在重启后会失去访问权限。沙盒会把 Application Support、UserDefaults 和缓存移入 `~/Library/Containers/<bundleID>/Data`，所以 `swift run` 期间保存的文件夹和偏好不会带到 `.app`。生成的 `Info.plist` 会声明 `CFBundleLocalizations`，让 AppKit 标准菜单跟随应用内语言。
+
+`make launch` 使用独立的开发身份：bundle ID 追加 `.dev`，显示名追加 ` Dev`。TCC 授权、UserDefaults 和沙盒容器都以 bundle ID 区分，因此反复重建开发版不会让正式版的权限失效（反之亦然）。
+
+### App Store
+
+```bash
+make mas                    # 产物：build/DemoExplorer-0.1-1.pkg
+```
+
+`make mas` 使用 Apple Distribution 签名并生成供 Transporter 使用的 `.pkg`。如果 `Scripts/App.entitlements` 没有开启 App Sandbox，脚本会直接报错。每次上传前递增 `AppInfo.build`（对应 `CFBundleVersion`）；`CFBundleShortVersionString` 来自 `AppInfo.version`。普通 App Store 提交不需要 provisioning profile，但 TestFlight 需要——传入 `PROVISION_PROFILE=...` 即可嵌入。公证（notarization）只用于 Developer ID 分发，不用于 App Store。`INSTALLER_IDENTITY` 可覆盖安装器证书。
+
+如果应用需要读取受 TCC 保护的文件夹（下载、桌面、文稿、相机、麦克风等），请在 `Scripts/make-app.sh` 的 Info.plist heredoc 中加入对应的 `NS*UsageDescription`，并提供 `Contents/Resources/<lang>.lproj/InfoPlist.strings` 本地化副本，让系统授权弹窗跟随用户语言。
 
 ## 项目结构
 
 ```
 Sources/
 ├── DemoExplorer/                 # Library target：全部视图、模型、store
-│   ├── AppInfo.swift             # 显示名 / bundle ID / 版本（唯一事实来源）
+│   ├── AppInfo.swift             # 显示名 / bundle ID / 版本 / 构建号（唯一事实来源）
 │   ├── ContentView.swift         # 分栏布局：侧边栏 + 详情页
 │   ├── FileListView.swift        # 卡片式文件列表
-│   ├── FolderStore.swift         # 侧边栏文件夹列表 + 持久化
+│   ├── FolderStore.swift         # 侧边栏文件夹列表 + security-scoped bookmark
 │   ├── Models.swift              # 文件加载、打开/定位助手、文件夹选择器
 │   ├── L10n.swift                # 本地化辅助
 │   ├── SettingsStore.swift       # 主题 + 语言偏好与持久化
@@ -79,17 +94,21 @@ Sources/
 │   ├── WindowFrameAutosaver.swift # 窗口位置手动保存/恢复（纯逻辑有测试）
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
-│       └── zh-Hans.lproj/Localizable.strings
+│       ├── zh-Hans.lproj/Localizable.strings
+│       └── PrivacyInfo.xcprivacy  # required-reason API 声明
 └── DemoExplorerApp/
     └── DemoExplorerApp.swift     # 薄 @main 入口和窗口场景
 Tests/DemoExplorerTests/          # Swift Testing 测试
 Scripts/
+├── App.entitlements              # App Sandbox + 用户选择文件 + bookmark
 ├── check-l10n.py                 # 本地化键对齐校验
-├── make-app.sh                   # release 构建 + .app 包组装
+├── make-app.sh                   # universal release 构建 + .app/.pkg 组装
 ├── make-icon.swift               # 应用图标程序化生成
-└── rename.sh                     # 一键模板重命名
+├── rename.sh                     # 一键模板重命名
+└── template-diff.sh              # 与 starter 的只读差异检查
 docs/
 └── ui-testing.md                 # AX + screencapture + CGEvent 验证手册
+TEMPLATE.md                       # 模板版本、托管文件与合并规则
 AGENTS.md                         # 面向人和 agent 的约定与坑位说明
 ```
 

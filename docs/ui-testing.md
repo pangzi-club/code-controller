@@ -11,13 +11,19 @@ AppKit/SwiftUI surface.
 ## Ground rules
 
 - **Test the `.app`, not `swift run`.** A bare SwiftPM binary gets no Dock icon
-  and no menu bar from Launch Services. Always `make app` first.
+  and no menu bar from Launch Services. Always assemble a bundle first:
+  `make app` for the shipping identity, or `make launch` for the dev identity.
 - **Names.** The display name and bundle ID live in `Sources/*/AppInfo.swift`;
   the executable target (and therefore the process) is `<Library>` + `App`.
   The helpers read the bundle ID from `APP_BUNDLE_ID`. Export it once per shell:
 
   ```sh
+  APP_NAME="$(sed -nE 's/^[[:space:]]*static let displayName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Sources/*/AppInfo.swift)"
   export APP_BUNDLE_ID="$(sed -nE 's/^[[:space:]]*static let bundleID[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Sources/*/AppInfo.swift)"
+  export APP_PATH="build/$APP_NAME.app"          # make app
+  # Dev build from `make launch`:
+  # export APP_BUNDLE_ID="$APP_BUNDLE_ID.dev"
+  # export APP_PATH="build/$APP_NAME Dev.app"
   export APP_PROCESS="$(ls build/*.app/Contents/MacOS | head -1)"
   ```
 
@@ -29,21 +35,27 @@ AppKit/SwiftUI surface.
   `NSEvent.mouseLocation` use bottom-left. Convert before comparing.
 - **State restoration.** Relaunching may restore only the settings window.
   Open the main window with ⌘N (File > New Window) when it is missing.
-- **Leave no traces.** Quit the app, restore dark mode, delete test `defaults`,
-  and remove temporary logs when finished.
+- **Leave no traces.** Quit the app, restore dark mode, delete test `defaults`
+  (from the sandbox container when testing the `.app`), and remove temporary
+  logs when finished.
 
 ## Build and launch loop
 
 ```sh
-make app
+make app                    # or: make launch (dev identity, opens automatically)
 pkill -x "$APP_PROCESS"; sleep 1
 # Optional: seed defaults before launch (language, theme, frame)
-open build/*.app
+open "$APP_PATH"
 sleep 3
 ```
 
 `pkill -x` matches the exact process name; when the app is not running it exits
 nonzero, which is harmless in a script.
+
+The shipping app and the `make launch` dev app are separate identities:
+bundle IDs (`<bundleID>` vs `<bundleID>.dev`), sandbox containers and TCC
+grants all differ. Export the matching `APP_BUNDLE_ID` and `APP_PATH` before
+seeding defaults. `swift run` is unsandboxed and shares neither.
 
 ## Helper toolkit
 
@@ -120,7 +132,7 @@ first appearance:
 ```sh
 screencapture -x -v -V 6 /tmp/launch.mov &
 sleep 1.2
-open build/*.app
+open "$APP_PATH"
 wait
 swift /tmp/frames.swift /tmp/launch.mov
 ```
@@ -169,10 +181,10 @@ The in-app language applies on relaunch:
 
 ```sh
 defaults write "$APP_BUNDLE_ID" language -string en
-pkill -x "$APP_PROCESS"; sleep 1; open build/*.app; sleep 3
+pkill -x "$APP_PROCESS"; sleep 1; open "$APP_PATH"; sleep 3
 screencapture -x -R14,39,1172,763 /tmp/en.png
 defaults delete "$APP_BUNDLE_ID" language   # restore Follow System
-pkill -x "$APP_PROCESS"; sleep 1; open build/*.app
+pkill -x "$APP_PROCESS"; sleep 1; open "$APP_PATH"
 ```
 
 Verify visible app text, not AX labels: system-provided UI (standard menus,
@@ -192,8 +204,9 @@ nonzero on a mismatch.
 
 ## Empty states
 
-1. Clear the saved folders: `defaults delete "$APP_BUNDLE_ID" folderPaths`
-   (or remove every folder through the context menu).
+1. Clear the saved folders: `defaults delete "$APP_BUNDLE_ID" folderBookmarks`
+   (and the legacy `folderPaths` key if present), or remove every folder
+   through the context menu.
 2. Relaunch and verify the placeholder message, the icon, and the prominent
    "Add Folder" button are centered in the detail pane.
 3. Add a folder, remove it again, and confirm the empty state returns.
@@ -202,11 +215,16 @@ nonzero on a mismatch.
 ## Defaults recipes
 
 The `.app` stores preferences under its bundle ID; `swift run` uses a different
-domain. Useful keys:
+domain. The shipping app is sandboxed, so its domain and container live under
+`~/Library/Containers/<bundleID>/Data`; `defaults` normally resolves it through
+cfprefsd, but read the container's `Library/Preferences/<bundleID>.plist`
+directly if a domain is not found. The `.dev` app uses the same paths with a
+`.dev` suffix.
 
 | Key | Meaning |
 | --- | --- |
-| `folderPaths` | Sidebar folder paths (string array) |
+| `folderBookmarks` | Sidebar folders (JSON-encoded path + security bookmark) |
+| `folderPaths` | Legacy sidebar paths, read only when no bookmarks exist |
 | `theme` | `system`, `light` or `dark` |
 | `language` | `en`, `zh-Hans`, or absent for Follow System |
 | `mainWindowFrame` | Saved frame (`NSStringFromRect` string) |
@@ -224,7 +242,8 @@ a fresh domain on a throwaway user account or a VM.
 
 1. `swift test` — logic still passes.
 2. `make check-l10n` — if any `.strings` file changed.
-3. `make app` — release build, icon, ad-hoc signing.
+3. `make app` — universal release build, sandboxed signature (Developer ID or
+   ad-hoc). Use `make launch` when testing the dev identity.
 4. Launch and capture the changed surface (window, settings pane, state).
 5. Check the empty/error path if the surface has one.
 6. Check dark mode and the other UI language for new strings.

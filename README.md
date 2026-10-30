@@ -13,7 +13,7 @@ the box.
 - **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Hover highlighting included.
 - **Opening files**: double-click a file to open it with the system default app; the context menu also offers "Open" and "Show in Finder".
 - **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide — a separate fixed-size window opened with ⌘, (App menu) or the sidebar gear.
-- **Persistence**: the folder list lives in UserDefaults (stale paths are dropped), and the window frame survives relaunches.
+- **Persistence**: the folder list is stored as security-scoped bookmarks in UserDefaults (sandbox-safe across relaunches; stale folders are dropped), and the window frame survives relaunches.
 - **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
 - Adapts to light and dark appearance.
 
@@ -36,8 +36,10 @@ swift test    # or: make test
 
 There is also a `Makefile` with npm-scripts style shortcuts: `make dev` (debug
 run), `make test`, `make check-l10n` (verify localization key parity),
-`make app` (assemble the .app), `make launch` (assemble + open), `make build`,
-`make rename` (template rename), `make clean`. Run `make help` to list them.
+`make app` (assemble the distribution .app), `make launch` (assemble and open
+the dev build), `make mas` (App Store package), `make build`, `make rename`
+(template rename), `make template-diff` (show template drift), `make clean`.
+Run `make help` to list them.
 
 ## Verifying the UI
 
@@ -74,41 +76,72 @@ or scripts added later are visible instead of silently stale. The display
 name can then be tuned freely in `AppInfo.swift` — it may contain spaces.
 `AGENTS.md` also documents the conventions and known gotchas of this codebase.
 
+`TEMPLATE.md` records the template version and the files that follow upstream.
+In a fork, run `make template-diff SOURCE=/path/to/swiftui-starter` to see the
+drift; the script is read-only, so app-specific additions can be merged by
+hand.
+
 ## Packaging as a .app
 
 For the proper experience (Dock icon, menu bar, Cmd+Tab, double-clickable in
 Finder), assemble an app bundle:
 
 ```bash
-./Scripts/make-app.sh          # result: build/DemoExplorer.app
-open build/DemoExplorer.app
+make app                    # build/DemoExplorer.app
+make launch                 # build/DemoExplorer Dev.app, opened
 ```
 
-The script builds the release binary, generates the app icon
-(`Scripts/make-icon.swift` draws it programmatically), and ad-hoc code signs the
-bundle. App identity lives in `Sources/DemoExplorer/AppInfo.swift` — the script
-reads the display name, bundle ID and version from there, and derives the
-target/binary name from `Package.swift`, so nothing is duplicated. The .app
-stores preferences under its bundle ID, so folders saved during `swift run`
-sessions won't carry over. `CFBundleLocalizations` is declared in the generated
-`Info.plist` so the standard AppKit menus follow the in-app language.
+`make-app.sh` builds a universal (arm64 + x86_64) release binary, generates the
+app icon (`Scripts/make-icon.swift` draws it programmatically), writes the
+Info.plist from `AppInfo.swift` (display name, bundle ID, marketing version and
+build number) and `Package.swift` (minimum macOS), copies the privacy
+manifest, and signs with `Scripts/App.entitlements`. `make app` uses a
+Developer ID certificate when the keychain has one and falls back to ad-hoc
+signing; `SIGN_IDENTITY` overrides the choice.
 
-If the app reads protected folders, add the matching `NS*UsageDescription` keys
-to the Info.plist heredoc in `Scripts/make-app.sh`, and localized copies in
-`Contents/Resources/<lang>.lproj/InfoPlist.strings` so the system prompt follows
-the user's language. Each rebuild re-signs the ad-hoc bundle, which changes the
-code identity macOS associates with TCC decisions — a fresh build may prompt
-again even if access was already granted.
+The app is sandboxed, so the demo persists app-scoped security bookmarks for
+its folders instead of plain paths — a path alone loses access after relaunch.
+The sandbox moves Application Support, UserDefaults and caches into
+`~/Library/Containers/<bundleID>/Data`, so folders and preferences saved during
+`swift run` do not carry over to the .app. `CFBundleLocalizations` is declared
+in the generated `Info.plist` so the standard AppKit menus follow the in-app
+language.
+
+`make launch` builds a separate dev identity: the bundle ID gets a `.dev`
+suffix and the display name a ` Dev` suffix. TCC grants, UserDefaults and the
+sandbox container are keyed by bundle ID, so rebuilding the dev app does not
+invalidate the shipping app's permissions (and vice versa).
+
+### App Store
+
+```bash
+make mas                    # build/DemoExplorer-0.1-1.pkg
+```
+
+`make mas` signs with Apple Distribution and writes a `.pkg` for Transporter.
+It refuses to run unless App Sandbox is enabled in
+`Scripts/App.entitlements`. Bump `AppInfo.build` for every upload
+(`CFBundleVersion`); `CFBundleShortVersionString` comes from `AppInfo.version`.
+A normal App Store submission does not need a provisioning profile, but
+TestFlight does — pass `PROVISION_PROFILE=...` to embed one. Notarization is
+only for Developer ID distribution. `INSTALLER_IDENTITY` overrides the
+installer certificate.
+
+If the app reads TCC-protected folders (Downloads, Desktop, Documents, camera,
+microphone, …), add the matching `NS*UsageDescription` keys to the Info.plist
+heredoc in `Scripts/make-app.sh`, plus localized copies in
+`Contents/Resources/<lang>.lproj/InfoPlist.strings`, so the system prompt
+follows the user's language.
 
 ## Project Layout
 
 ```
 Sources/
 ├── DemoExplorer/                 # Library target: all views, models, stores
-│   ├── AppInfo.swift             # Display name / bundle ID / version (single source of truth)
+│   ├── AppInfo.swift             # Display name / bundle ID / version / build (single source of truth)
 │   ├── ContentView.swift         # Split layout with sidebar and detail pane
 │   ├── FileListView.swift        # Card-style file list
-│   ├── FolderStore.swift         # Sidebar folder list + persistence
+│   ├── FolderStore.swift         # Sidebar folder list + security-scoped bookmarks
 │   ├── Models.swift              # File loading, open/reveal helpers, folder picker
 │   ├── L10n.swift                # Localization helpers
 │   ├── SettingsStore.swift       # Theme + language preferences and persistence
@@ -116,17 +149,21 @@ Sources/
 │   ├── WindowFrameAutosaver.swift # Manual window frame save/restore (tested pure logic)
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
-│       └── zh-Hans.lproj/Localizable.strings
+│       ├── zh-Hans.lproj/Localizable.strings
+│       └── PrivacyInfo.xcprivacy  # Required-reason API declarations
 └── DemoExplorerApp/
     └── DemoExplorerApp.swift     # Thin @main entry point and window scene
 Tests/DemoExplorerTests/          # Swift Testing suite
 Scripts/
+├── App.entitlements              # App Sandbox + user-selected files + bookmarks
 ├── check-l10n.py                 # Localization key parity check
-├── make-app.sh                   # Release build + .app bundle assembly
+├── make-app.sh                   # Universal release build + .app/.pkg assembly
 ├── make-icon.swift               # Programmatic app icon generator
-└── rename.sh                     # One-shot template rename
+├── rename.sh                     # One-shot template rename
+└── template-diff.sh              # Read-only drift check against a starter checkout
 docs/
 └── ui-testing.md                 # AX + screencapture + CGEvent verification playbook
+TEMPLATE.md                       # Template version, managed files and merge rules
 AGENTS.md                         # Conventions and gotchas for humans and agents
 ```
 

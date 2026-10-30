@@ -9,33 +9,114 @@ struct Folder: Identifiable, Hashable {
 }
 
 /// Manages the sidebar folder list and persists it to UserDefaults.
+///
+/// The app is sandboxed, so a plain path is not enough after relaunch: each
+/// entry stores an app-scoped security bookmark, resolved on launch. The
+/// security scope stays open while the folder is listed, so loading its
+/// children and opening its files keeps working.
 @MainActor
 final class FolderStore: ObservableObject {
     @Published private(set) var folders: [Folder] {
-        didSet { UserDefaults.standard.set(folders.map(\.url.path), forKey: Self.storageKey) }
+        didSet { persist() }
     }
 
-    private static let storageKey = "folderPaths"
+    private struct StoredFolder: Codable {
+        var path: String
+        var bookmark: Data?
+    }
+
+    private static let storageKey = "folderBookmarks"
+
+    /// Folders saved by older builds (and by `swift run`) had no bookmarks.
+    private static let legacyStorageKey = "folderPaths"
+
+    private var scopedURLs: Set<URL> = []
 
     init() {
-        let paths = UserDefaults.standard.stringArray(forKey: Self.storageKey) ?? []
-        let fileManager = FileManager.default
-        // Drop folders that were moved or deleted since the last launch.
-        folders = paths
-            .map { Folder(id: UUID(), url: URL(fileURLWithPath: $0)) }
-            .filter { fileManager.fileExists(atPath: $0.url.path) }
+        let stored = Self.loadStoredFolders()
+        var restored: [Folder] = []
+        for entry in stored {
+            guard let url = Self.resolve(entry) else { continue }
+            // Start the scope before checking readability: the sandbox only
+            // grants access to a bookmarked folder once its scope is active.
+            let scoped = url.startAccessingSecurityScopedResource()
+            guard FileManager.default.isReadableFile(atPath: url.path) else {
+                if scoped { url.stopAccessingSecurityScopedResource() }
+                continue
+            }
+            if scoped { scopedURLs.insert(url) }
+            restored.append(Folder(id: UUID(), url: url))
+        }
+        folders = restored
+    }
+
+    deinit {
+        for url in scopedURLs {
+            url.stopAccessingSecurityScopedResource()
+        }
     }
 
     @discardableResult
     func add(_ url: URL) -> Folder? {
         let standardized = url.standardizedFileURL
         guard !folders.contains(where: { $0.url.standardizedFileURL == standardized }) else { return nil }
+        if url.startAccessingSecurityScopedResource() {
+            scopedURLs.insert(url)
+        }
         let folder = Folder(id: UUID(), url: url)
         folders.append(folder)
         return folder
     }
 
     func remove(_ folder: Folder) {
+        if let url = folders.first(where: { $0.id == folder.id })?.url,
+           scopedURLs.remove(url) != nil {
+            url.stopAccessingSecurityScopedResource()
+        }
         folders.removeAll { $0.id == folder.id }
+    }
+
+    private func persist() {
+        let stored = folders.map { folder -> StoredFolder in
+            StoredFolder(
+                path: folder.url.path,
+                bookmark: try? folder.url.bookmarkData(
+                    options: .withSecurityScope,
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                )
+            )
+        }
+        guard let data = try? JSONEncoder().encode(stored) else { return }
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+
+    private static func loadStoredFolders() -> [StoredFolder] {
+        if let data = UserDefaults.standard.data(forKey: storageKey),
+           let stored = try? JSONDecoder().decode([StoredFolder].self, from: data) {
+            return stored
+        }
+        let paths = UserDefaults.standard.stringArray(forKey: legacyStorageKey) ?? []
+        return paths.map { StoredFolder(path: $0, bookmark: nil) }
+    }
+
+    private static func resolve(_ entry: StoredFolder) -> URL? {
+        if let bookmark = entry.bookmark {
+            var isStale = false
+            if let url = try? URL(
+                resolvingBookmarkData: bookmark,
+                options: .withSecurityScope,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            ), FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+        }
+        // Missing or unresolvable bookmarks fall back to the last known path.
+        // Inside the sandbox that path only works when it is still reachable;
+        // stale entries are dropped like any other deleted folder.
+        let url = URL(fileURLWithPath: entry.path)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
     }
 }
