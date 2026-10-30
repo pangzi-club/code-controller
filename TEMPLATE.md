@@ -18,6 +18,7 @@ The script is read-only. It prints a unified diff (upstream → local) for:
 - `Makefile`
 - `.vscode/launch.json`
 - `Scripts/App.entitlements`
+- `Scripts/App.sandbox.entitlements`
 - `Scripts/check-l10n.py`
 - `Scripts/make-app.sh`
 - `Scripts/make-icon.swift`
@@ -59,3 +60,6 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
   `rename.sh` rewrites the target names with the rest of the app.
 - 2026-10-30 — docs: the UI playbook now includes the cumulative-CPU
   measurement recipe and `sample` profiling.
+- 2026-10-30 — sandbox policy: local and Developer ID builds are unsandboxed
+  and use `Scripts/App.entitlements`; only `make mas` signs with
+  `Scripts/App.sandbox.entitlements` and requires App Sandbox.

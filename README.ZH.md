@@ -10,7 +10,7 @@
 - **文件列表**：卡片式展示所选文件夹的直接子项（文件夹在前，再按名称排序），带系统图标、文件大小和修改时间，支持悬停高亮。
 - **打开文件**：双击用系统默认应用打开；右键菜单提供「打开」和「在 Finder 中显示」。
 - **设置窗口**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局——独立固定尺寸窗口，⌘,（App 菜单）或侧边栏齿轮均可打开。
-- **持久化**：文件夹列表以 security-scoped bookmark 的形式存于 UserDefaults（沙盒环境下重启仍可访问；失效文件夹会被过滤），窗口位置和大小跨启动保留。
+- **持久化**：文件夹列表以 security-scoped bookmark 的形式存于 UserDefaults（App Store 沙盒构建在重启后仍可访问；失效文件夹会被过滤），窗口位置和大小跨启动保留。
 - **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
 - **诊断**：结构化统一日志会同步写入轮转文件日志，启动横幅会记录 bundle、沙盒和日志路径。
 - 自动适配浅色 / 深色外观。
@@ -41,7 +41,7 @@ swift test    # 或：make test
 
 `Log` 会把日志写入统一日志（subsystem = bundle ID），并同步镜像到
 `~/Library/Logs/<显示名>/app.log`；启动时若文件超过 2 MB，会轮转为
-`app.log.1`。沙盒 `.app` 的路径位于容器内
+`app.log.1`。App Store 构建的同一路径位于沙盒容器内
 （`~/Library/Containers/<bundleID>/Data/Library/Logs/...`）。`Log.bootstrap()`
 会在首个窗口出现前记录 bundle、沙盒和日志路径。实时查看：
 
@@ -75,11 +75,11 @@ make app                    # 产物：build/DemoExplorer.app
 make launch                 # 产物：build/DemoExplorer Dev.app，并打开
 ```
 
-`make-app.sh` 会构建 universal（arm64 + x86_64）release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist、复制隐私清单，并使用 `Scripts/App.entitlements` 签名。`make app` 优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。
+`make-app.sh` 会构建 universal（arm64 + x86_64）release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist，并复制隐私清单。`make app` 使用 `Scripts/App.entitlements` 签名，优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。本地和 Developer ID 构建**默认不开启沙盒**，需要本地或 hardened runtime 权限时往该文件里加。
 
-应用默认开启 App Sandbox，因此 demo 用 security-scoped bookmark 持久化文件夹，而不是只存路径——仅凭路径在重启后会失去访问权限。沙盒会把 Application Support、UserDefaults 和缓存移入 `~/Library/Containers/<bundleID>/Data`，所以 `swift run` 期间保存的文件夹和偏好不会带到 `.app`。生成的 `Info.plist` 会声明 `CFBundleLocalizations`，让 AppKit 标准菜单跟随应用内语言。
+App Store 构建开启 App Sandbox，因此 demo 用 security-scoped bookmark 持久化文件夹，而不是只存路径——仅凭路径在重启后会失去访问权限。沙盒会把 Application Support、UserDefaults 和缓存移入 `~/Library/Containers/<bundleID>/Data`，所以 `swift run` 或 `make app` 期间保存的文件夹和偏好不会带到 App Store 构建。生成的 `Info.plist` 会声明 `CFBundleLocalizations`，让 AppKit 标准菜单跟随应用内语言。
 
-`make launch` 使用独立的开发身份：bundle ID 追加 `.dev`，显示名追加 ` Dev`。TCC 授权、UserDefaults 和沙盒容器都以 bundle ID 区分，因此反复重建开发版不会让正式版的权限失效（反之亦然）。
+`make launch` 使用独立的开发身份：bundle ID 追加 `.dev`，显示名追加 ` Dev`。TCC 授权和 UserDefaults 都以 bundle ID 区分（开启沙盒时还包括容器），因此反复重建开发版不会让正式版的权限失效（反之亦然）。
 
 ### App Store
 
@@ -87,7 +87,7 @@ make launch                 # 产物：build/DemoExplorer Dev.app，并打开
 make mas                    # 产物：build/DemoExplorer-0.1-1.pkg
 ```
 
-`make mas` 使用 Apple Distribution 签名并生成供 Transporter 使用的 `.pkg`。如果 `Scripts/App.entitlements` 没有开启 App Sandbox，脚本会直接报错。每次上传前递增 `AppInfo.build`（对应 `CFBundleVersion`）；`CFBundleShortVersionString` 来自 `AppInfo.version`。普通 App Store 提交不需要 provisioning profile，但 TestFlight 需要——传入 `PROVISION_PROFILE=...` 即可嵌入。公证（notarization）只用于 Developer ID 分发，不用于 App Store。`INSTALLER_IDENTITY` 可覆盖安装器证书。
+`make mas` 使用 Apple Distribution 签名并生成供 Transporter 使用的 `.pkg`；它使用 `Scripts/App.sandbox.entitlements`，如果该文件没有开启 App Sandbox 会直接报错。每次上传前递增 `AppInfo.build`（对应 `CFBundleVersion`）；`CFBundleShortVersionString` 来自 `AppInfo.version`。普通 App Store 提交不需要 provisioning profile，但 TestFlight 需要——传入 `PROVISION_PROFILE=...` 即可嵌入。公证（notarization）只用于 Developer ID 分发，不用于 App Store。`INSTALLER_IDENTITY` 可覆盖安装器证书。
 
 如果应用需要读取受 TCC 保护的文件夹（下载、桌面、文稿、相机、麦克风等），请在 `Scripts/make-app.sh` 的 Info.plist heredoc 中加入对应的 `NS*UsageDescription`，并提供 `Contents/Resources/<lang>.lproj/InfoPlist.strings` 本地化副本，让系统授权弹窗跟随用户语言。
 
@@ -115,7 +115,8 @@ Sources/
     └── DemoExplorerApp.swift     # 薄 @main 入口和窗口场景
 Tests/DemoExplorerTests/          # Swift Testing 测试
 Scripts/
-├── App.entitlements              # App Sandbox + 用户选择文件 + bookmark
+├── App.entitlements              # 本地/Developer ID 权限（不沙盒）
+├── App.sandbox.entitlements      # App Store：沙盒 + 用户选择文件 + bookmark
 ├── check-l10n.py                 # 本地化键对齐校验
 ├── make-app.sh                   # universal release 构建 + .app/.pkg 组装
 ├── make-icon.swift               # 应用图标程序化生成

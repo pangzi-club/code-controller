@@ -5,13 +5,14 @@
 # version are derived from Package.swift via `swift package describe`, so
 # nothing is duplicated here.
 #
-# The bundle is built universal (arm64 + x86_64) and signed with the App
-# Sandbox entitlements in Scripts/App.entitlements.
+# The bundle is built universal (arm64 + x86_64). Local and Developer ID
+# builds sign with Scripts/App.entitlements (unsandboxed by default); the App
+# Store build signs with Scripts/App.sandbox.entitlements.
 #
 # Usage:
 #   ./Scripts/make-app.sh          # Developer ID (or ad-hoc) build, direct distribution
 #   DEV=1 ./Scripts/make-app.sh    # local dev build: .dev bundle ID + " Dev" name
-#   MAS=1 ./Scripts/make-app.sh    # App Store build + .pkg, Apple Distribution signing
+#   MAS=1 ./Scripts/make-app.sh    # App Store build + .pkg, sandboxed, Apple Distribution
 #
 # Environment overrides:
 #   SIGN_IDENTITY        signing identity (defaults to Developer ID Application
@@ -54,8 +55,13 @@ BUILD="$(read_swift_constant build)"
 [[ -n "$APP_DISPLAY_NAME" && -n "$BUNDLE_ID" && -n "$VERSION" && -n "$BUILD" ]] \
     || die "displayName / bundleID / version / build not found in $APPINFO"
 
-ENTITLEMENTS="$ROOT/Scripts/App.entitlements"
-[[ -f "$ENTITLEMENTS" ]] || die "Scripts/App.entitlements not found"
+# Direct distribution does not require App Sandbox; the App Store does.
+if [[ "$MAS" == "1" ]]; then
+    ENTITLEMENTS="$ROOT/Scripts/App.sandbox.entitlements"
+else
+    ENTITLEMENTS="$ROOT/Scripts/App.entitlements"
+fi
+[[ -f "$ENTITLEMENTS" ]] || die "${ENTITLEMENTS#"$ROOT"/} not found"
 PRIVACY_MANIFEST="$(dirname "$APPINFO")/Resources/PrivacyInfo.xcprivacy"
 [[ -f "$PRIVACY_MANIFEST" ]] || die "$PRIVACY_MANIFEST not found"
 
@@ -64,12 +70,12 @@ PRIVACY_MANIFEST="$(dirname "$APPINFO")/Resources/PrivacyInfo.xcprivacy"
 if [[ "$MAS" == "1" ]]; then
     SANDBOX_ENABLED="$(/usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" "$ENTITLEMENTS" 2>/dev/null || true)"
     [[ "$SANDBOX_ENABLED" == "true" ]] \
-        || die "MAS=1 requires com.apple.security.app-sandbox in $ENTITLEMENTS"
+        || die "MAS=1 requires com.apple.security.app-sandbox in ${ENTITLEMENTS#"$ROOT"/}"
 fi
 
-# Dev builds get their own identity: TCC grants, UserDefaults and the sandbox
-# container are keyed by bundle ID, so local runs keep separate state instead
-# of colliding with the shipping build.
+# Dev builds get their own identity: TCC grants and UserDefaults are keyed by
+# bundle ID, so local runs keep separate state instead of colliding with the
+# shipping build (and, when sandboxed, a separate container).
 if [[ "$DEV" == "1" ]]; then
     EFFECTIVE_BUNDLE_ID="$BUNDLE_ID.dev"
     EFFECTIVE_DISPLAY_NAME="$APP_DISPLAY_NAME Dev"
@@ -175,6 +181,7 @@ else
 fi
 
 echo "==> Code signing…"
+echo "    entitlements: ${ENTITLEMENTS#"$ROOT"/}"
 if [[ -n "$IDENTITY" ]]; then
     echo "    identity: $IDENTITY"
     # Hardened runtime is required once notarization is added; keep it on from

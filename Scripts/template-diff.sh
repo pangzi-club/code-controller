@@ -25,6 +25,7 @@ FILES=(
     .vscode/launch.json
     Makefile
     Scripts/App.entitlements
+    Scripts/App.sandbox.entitlements
     Scripts/check-l10n.py
     Scripts/make-app.sh
     Scripts/make-icon.swift

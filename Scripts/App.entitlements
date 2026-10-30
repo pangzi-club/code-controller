@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Local and Developer ID builds are not sandboxed, so they need no
+         entitlements by default. Add hardened-runtime or other local
+         entitlements here. The App Store build uses
+         Scripts/App.sandbox.entitlements instead. -->
+</dict>
+</plist>

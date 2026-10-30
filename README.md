@@ -13,7 +13,7 @@ the box.
 - **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Hover highlighting included.
 - **Opening files**: double-click a file to open it with the system default app; the context menu also offers "Open" and "Show in Finder".
 - **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide — a separate fixed-size window opened with ⌘, (App menu) or the sidebar gear.
-- **Persistence**: the folder list is stored as security-scoped bookmarks in UserDefaults (sandbox-safe across relaunches; stale folders are dropped), and the window frame survives relaunches.
+- **Persistence**: the folder list is stored as security-scoped bookmarks in UserDefaults (so the sandboxed App Store build keeps access across relaunches; stale folders are dropped), and the window frame survives relaunches.
 - **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
 - **Diagnostics**: structured unified logging mirrored to a rotating file log, with a launch banner that records the bundle, sandbox and log paths.
 - Adapts to light and dark appearance.
@@ -55,8 +55,8 @@ playbook, including the helper sources and the per-change checklist.
 
 `Log` writes to unified logging (subsystem = bundle ID) and mirrors every line
 to `~/Library/Logs/<display name>/app.log`, rotated to `app.log.1` when it
-exceeds 2 MB at launch. The sandboxed `.app` keeps the same path inside its
-container (`~/Library/Containers/<bundleID>/Data/Library/Logs/...`).
+exceeds 2 MB at launch. The App Store build keeps the same path inside its
+sandbox container (`~/Library/Containers/<bundleID>/Data/Library/Logs/...`).
 `Log.bootstrap()` records the bundle, sandbox and log paths before the first
 window appears. Stream live with:
 
@@ -111,23 +111,24 @@ make launch                 # build/DemoExplorer Dev.app, opened
 `make-app.sh` builds a universal (arm64 + x86_64) release binary, generates the
 app icon (`Scripts/make-icon.swift` draws it programmatically), writes the
 Info.plist from `AppInfo.swift` (display name, bundle ID, marketing version and
-build number) and `Package.swift` (minimum macOS), copies the privacy
-manifest, and signs with `Scripts/App.entitlements`. `make app` uses a
-Developer ID certificate when the keychain has one and falls back to ad-hoc
-signing; `SIGN_IDENTITY` overrides the choice.
+build number) and `Package.swift` (minimum macOS), and copies the privacy
+manifest. `make app` signs with `Scripts/App.entitlements` and uses a Developer
+ID certificate when the keychain has one (ad-hoc fallback); `SIGN_IDENTITY`
+overrides the choice. Local and Developer ID builds are **not sandboxed** by
+default — add local or hardened-runtime entitlements to that file when needed.
 
-The app is sandboxed, so the demo persists app-scoped security bookmarks for
-its folders instead of plain paths — a path alone loses access after relaunch.
-The sandbox moves Application Support, UserDefaults and caches into
-`~/Library/Containers/<bundleID>/Data`, so folders and preferences saved during
-`swift run` do not carry over to the .app. `CFBundleLocalizations` is declared
-in the generated `Info.plist` so the standard AppKit menus follow the in-app
-language.
+The App Store build is sandboxed, so the demo persists app-scoped security
+bookmarks for its folders instead of plain paths — a path alone loses access
+after relaunch. The sandbox moves Application Support, UserDefaults and caches
+into `~/Library/Containers/<bundleID>/Data`, so folders and preferences saved
+during `swift run` or `make app` do not carry over to the App Store build.
+`CFBundleLocalizations` is declared in the generated `Info.plist` so the
+standard AppKit menus follow the in-app language.
 
 `make launch` builds a separate dev identity: the bundle ID gets a `.dev`
-suffix and the display name a ` Dev` suffix. TCC grants, UserDefaults and the
-sandbox container are keyed by bundle ID, so rebuilding the dev app does not
-invalidate the shipping app's permissions (and vice versa).
+suffix and the display name a ` Dev` suffix. TCC grants and UserDefaults are
+keyed by bundle ID (and, when sandboxed, the container), so rebuilding the dev
+app does not invalidate the shipping app's permissions (and vice versa).
 
 ### App Store
 
@@ -136,8 +137,8 @@ make mas                    # build/DemoExplorer-0.1-1.pkg
 ```
 
 `make mas` signs with Apple Distribution and writes a `.pkg` for Transporter.
-It refuses to run unless App Sandbox is enabled in
-`Scripts/App.entitlements`. Bump `AppInfo.build` for every upload
+It signs with `Scripts/App.sandbox.entitlements` and refuses to run unless App
+Sandbox is enabled there. Bump `AppInfo.build` for every upload
 (`CFBundleVersion`); `CFBundleShortVersionString` comes from `AppInfo.version`.
 A normal App Store submission does not need a provisioning profile, but
 TestFlight does — pass `PROVISION_PROFILE=...` to embed one. Notarization is
@@ -174,7 +175,8 @@ Sources/
     └── DemoExplorerApp.swift     # Thin @main entry point and window scene
 Tests/DemoExplorerTests/          # Swift Testing suite
 Scripts/
-├── App.entitlements              # App Sandbox + user-selected files + bookmarks
+├── App.entitlements              # Local/Developer ID entitlements (unsandboxed)
+├── App.sandbox.entitlements      # App Store: sandbox + user-selected files + bookmarks
 ├── check-l10n.py                 # Localization key parity check
 ├── make-app.sh                   # Universal release build + .app/.pkg assembly
 ├── make-icon.swift               # Programmatic app icon generator

@@ -25,12 +25,12 @@ instead of a developer's home path.
 - `make check-l10n` — verify both `Localizable.strings` files have the same keys
 - `make build` — release build
 - `make app` — assemble `build/<Display Name>.app` (universal release build,
-  sandboxed, Developer ID when the keychain has one, otherwise ad-hoc)
-- `make mas` — assemble the App Store build and
+  unsandboxed, Developer ID when the keychain has one, otherwise ad-hoc)
+- `make mas` — assemble the sandboxed App Store build and
   `build/<Display Name>-<version>-<build>.pkg` (Apple Distribution;
   `PROVISION_PROFILE` embeds a TestFlight profile)
 - `make launch` — assemble and open `build/<Display Name> Dev.app` with bundle
-  ID `<bundleID>.dev` and its own TCC grant and sandbox container
+  ID `<bundleID>.dev` and its own TCC grants and UserDefaults
 - `make rename NEW=MyApp ID=com.me.MyApp` — full template rename (see below)
 - `make template-diff SOURCE=/path/to/swiftui-starter` — show drift in
   template-managed files (see `TEMPLATE.md`)
@@ -77,15 +77,16 @@ instead of a developer's home path.
 - **State** lives in `ObservableObject` stores (`SettingsStore`, `FolderStore`)
   persisted to UserDefaults and injected via `.environmentObject`. The folder
   list stores app-scoped security bookmarks under `folderBookmarks` (not plain
-  paths), so sandboxed access survives relaunch; `FolderStore` starts each
-  scope on launch and stops it when the folder is removed. The main
-  window frame persists through `WindowFrameAutosaver` — manual save/restore
-  under the fixed UserDefaults key `mainWindowFrame`, bypassing NSWindow
-  autosave so `swift run` and the .app behave identically. It captures the
-  window synchronously in `viewWillMove(toWindow:)`, hides it, restores the
-  frame, then reveals it, so SwiftUI's default size never flashes. The pure
-  logic in `WindowFramePersistence` (parse / restorable / clamp / default) has
-  tests.
+  paths), so the sandboxed App Store build keeps access across relaunch;
+  `FolderStore` starts each scope on launch and stops it when the folder is
+  removed. Local builds are unsandboxed but resolve the same bookmarks. The
+  main window frame persists through `WindowFrameAutosaver` — manual
+  save/restore under the fixed UserDefaults key `mainWindowFrame`, bypassing
+  NSWindow autosave so `swift run` and the .app behave identically. It
+  captures the window synchronously in `viewWillMove(toWindow:)`, hides it,
+  restores the frame, then reveals it, so SwiftUI's default size never
+  flashes. The pure logic in `WindowFramePersistence` (parse / restorable /
+  clamp / default) has tests.
 - **Settings is a separate window**, not a page inside the main window: a
   single-instance `Window` scene (`id: "settings"`, fixed content size,
   centered). The sidebar gear opens it via `@Environment(\.openWindow)`;
@@ -105,13 +106,19 @@ instead of a developer's home path.
 
 ## Sandbox and distribution
 
-- The app is always signed with `Scripts/App.entitlements`: App Sandbox,
-  user-selected read-write and app-scoped bookmarks. Add an entitlement only
-  when a feature requires one — App Review sees all of them.
-- The sandbox moves Application Support, Caches, Logs and UserDefaults into
-  `~/Library/Containers/<bundleID>/Data`. PNGs and other user-selected files
-  stay where they are. `swift run` is not sandboxed, so file paths and access
-  rules differ; test sandbox behavior with `make app` / `make launch`.
+- Local and Developer ID builds (`make app`, `make launch`, `swift run`) are
+  **not sandboxed**. `make app` signs with `Scripts/App.entitlements`, which is
+  empty by default; add local or hardened-runtime entitlements there.
+- The App Store build (`make mas`) signs with
+  `Scripts/App.sandbox.entitlements`: App Sandbox, user-selected read-write
+  and app-scoped bookmarks. The script refuses to package without App Sandbox.
+  Add an entitlement only when a feature requires one — App Review sees all
+  of them.
+- The sandbox (MAS build only) moves Application Support, Caches, Logs and
+  UserDefaults into `~/Library/Containers/<bundleID>/Data`; user-selected
+  files stay where they are. Test sandbox behavior with the `make mas` build:
+  `make app`, `make launch` and `swift run` read normal paths and will happily
+  access files the App Store build rejects.
 - `AppInfo.build` is the App Store build number: bump it for every upload
   (`CFBundleVersion`); `CFBundleShortVersionString` comes from `version`.
   `LSMinimumSystemVersion` is parsed from `Package.swift`.
@@ -120,15 +127,15 @@ instead of a developer's home path.
   Update it whenever a new required-reason API appears; `make-app.sh` copies it
   to the app's top-level `Contents/Resources`.
 - **Dev builds use a separate identity**: `DEV=1` (what `make launch` runs)
-  appends `.dev` to the bundle ID and " Dev" to the display name. TCC grants,
-  UserDefaults and the sandbox container are keyed by bundle ID, so the dev
-  build keeps its own grants instead of invalidating the shipping build's (and
-  vice versa). `DEV=1` and `MAS=1` are mutually exclusive.
-- `make mas` signs with Apple Distribution and emits a `.pkg` for Transporter;
-  it refuses to run unless App Sandbox is enabled. A normal App Store
-  submission does not need a provisioning profile — App Sandbox entitlements
-  are unrestricted — but TestFlight does; pass `PROVISION_PROFILE=...` to embed
-  one. Notarization is only for Developer ID distribution, not the App Store.
+  appends `.dev` to the bundle ID and " Dev" to the display name. TCC grants
+  and UserDefaults are keyed by bundle ID (and the sandbox container, when
+  sandboxed), so the dev build keeps its own state instead of colliding with
+  the shipping build. `DEV=1` and `MAS=1` are mutually exclusive.
+- `make mas` signs with Apple Distribution and emits a `.pkg` for Transporter.
+  A normal App Store submission does not need a provisioning profile — App
+  Sandbox entitlements are unrestricted — but TestFlight does; pass
+  `PROVISION_PROFILE=...` to embed one. Notarization is only for Developer ID
+  distribution, not the App Store.
 - TCC grants are keyed to the signing identity, so switching between Developer
   ID, Apple Distribution (`make mas`) and ad-hoc resets them. Test on a clean
   account with `tccutil reset ScreenCapture <bundleID>` (or the matching

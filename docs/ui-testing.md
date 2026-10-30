@@ -12,7 +12,8 @@ AppKit/SwiftUI surface.
 
 - **Test the `.app`, not `swift run`.** A bare SwiftPM binary gets no Dock icon
   and no menu bar from Launch Services. Always assemble a bundle first:
-  `make app` for the shipping identity, or `make launch` for the dev identity.
+  `make app` for the local/Developer ID build, `make mas` for the sandboxed
+  App Store build, or `make launch` for the dev identity.
 - **Names.** The display name and bundle ID live in `Sources/*/AppInfo.swift`;
   the executable target (and therefore the process) is `<Library>` + `App`.
   The helpers read the bundle ID from `APP_BUNDLE_ID`. Export it once per shell:
@@ -36,8 +37,8 @@ AppKit/SwiftUI surface.
 - **State restoration.** Relaunching may restore only the settings window.
   Open the main window with ⌘N (File > New Window) when it is missing.
 - **Leave no traces.** Quit the app, restore dark mode, delete test `defaults`
-  (from the sandbox container when testing the `.app`), and remove temporary
-  logs when finished.
+  (from the sandbox container when testing the App Store build), and remove
+  temporary logs when finished.
 
 ## Build and launch loop
 
@@ -52,10 +53,12 @@ sleep 3
 `pkill -x` matches the exact process name; when the app is not running it exits
 nonzero, which is harmless in a script.
 
-The shipping app and the `make launch` dev app are separate identities:
-bundle IDs (`<bundleID>` vs `<bundleID>.dev`), sandbox containers and TCC
-grants all differ. Export the matching `APP_BUNDLE_ID` and `APP_PATH` before
-seeding defaults. `swift run` is unsandboxed and shares neither.
+The `make app` and `make launch` builds are unsandboxed. The `make mas` build
+is the sandboxed one: it uses the same bundle ID as `make app` but keeps its
+preferences and logs under `~/Library/Containers/<bundleID>/Data`. The `.dev`
+app from `make launch` has a separate bundle ID and separate TCC grants and
+defaults. Export the matching `APP_BUNDLE_ID` and `APP_PATH` before seeding
+defaults; `swift run` shares neither.
 
 ## Helper toolkit
 
@@ -253,11 +256,11 @@ sample $(pgrep -x "$APP_PROCESS") 5 1 -file /tmp/app-sample.txt
 ## Defaults recipes
 
 The `.app` stores preferences under its bundle ID; `swift run` uses a different
-domain. The shipping app is sandboxed, so its domain and container live under
-`~/Library/Containers/<bundleID>/Data`; `defaults` normally resolves it through
-cfprefsd, but read the container's `Library/Preferences/<bundleID>.plist`
-directly if a domain is not found. The `.dev` app uses the same paths with a
-`.dev` suffix.
+domain. `make app` and `make launch` write the normal
+`~/Library/Preferences/<bundleID>.plist`. The sandboxed `make mas` build keeps
+its domain and container under `~/Library/Containers/<bundleID>/Data`;
+`defaults` normally resolves it through cfprefsd, but read the container's
+`Library/Preferences/<bundleID>.plist` directly if a domain is not found.
 
 | Key | Meaning |
 | --- | --- |
@@ -280,8 +283,9 @@ a fresh domain on a throwaway user account or a VM.
 
 1. `swift test` — logic still passes.
 2. `make check-l10n` — if any `.strings` file changed.
-3. `make app` — universal release build, sandboxed signature (Developer ID or
-   ad-hoc). Use `make launch` when testing the dev identity.
+3. `make app` — universal release build, unsandboxed signature (Developer ID
+   or ad-hoc). Use `make mas` for the sandboxed App Store build and
+   `make launch` for the dev identity.
 4. Launch and capture the changed surface (window, settings pane, state).
 5. Check the empty/error path if the surface has one.
 6. Check dark mode and the other UI language for new strings.

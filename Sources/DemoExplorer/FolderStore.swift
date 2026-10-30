@@ -10,10 +10,11 @@ struct Folder: Identifiable, Hashable {
 
 /// Manages the sidebar folder list and persists it to UserDefaults.
 ///
-/// The app is sandboxed, so a plain path is not enough after relaunch: each
-/// entry stores an app-scoped security bookmark, resolved on launch. The
-/// security scope stays open while the folder is listed, so loading its
-/// children and opening its files keeps working.
+/// The App Store build is sandboxed, so a plain path is not enough after
+/// relaunch: each entry stores an app-scoped security bookmark, resolved on
+/// launch. The security scope stays open while the folder is listed, so
+/// loading its children and opening its files keeps working. Local builds are
+/// unsandboxed but use the same bookmarks.
 @MainActor
 final class FolderStore: ObservableObject {
     @Published private(set) var folders: [Folder] {
@@ -116,8 +117,9 @@ final class FolderStore: ObservableObject {
             }
         }
         // Missing or unresolvable bookmarks fall back to the last known path.
-        // Inside the sandbox that path only works when it is still reachable;
-        // stale entries are dropped like any other deleted folder.
+        // Inside the sandbox (the App Store build) that path only works when
+        // it is still reachable; stale entries are dropped like any other
+        // deleted folder.
         let url = URL(fileURLWithPath: entry.path)
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         return url
