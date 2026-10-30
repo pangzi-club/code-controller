@@ -212,6 +212,44 @@ nonzero on a mismatch.
 3. Add a folder, remove it again, and confirm the empty state returns.
 4. Drag a folder over the sidebar and capture the drop highlight mid-drag.
 
+## Performance measurements
+
+`top` snapshots are noisy; measure average CPU from `ps` cumulative CPU time:
+
+```sh
+PID=$(pgrep -x "$APP_PROCESS")
+start=$(ps -o time= -p "$PID" | tr -d ' '); t0=$(date +%s)
+sleep 90
+end=$(ps -o time= -p "$PID" | tr -d ' '); t1=$(date +%s)
+python3 - "$start" "$end" "$t0" "$t1" <<'PY'
+import sys
+def secs(t):
+    parts = [float(p) for p in t.split(':')]
+    total = 0.0
+    for part in parts:
+        total = total * 60 + part
+    return total
+start, end, t0, t1 = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+print(f"cpu {(secs(end) - secs(start)) / (t1 - t0) * 100:.2f}% over {t1 - t0}s")
+PY
+```
+
+Compare configurations deliberately:
+
+- **Idle:** close every window (⌘W; confirm with `axfind "AXWindow"`), measure
+  60–90 s.
+- **Active:** open the changed surface and repeat.
+- **Baseline:** disable or pause the new work when the UI allows it; the
+  difference is its cost.
+
+If one path looks expensive, add temporary millisecond marks around it, run
+for ~20 samples, read the log, and remove the instrumentation before
+committing. Use `sample` for a stack profile:
+
+```sh
+sample $(pgrep -x "$APP_PROCESS") 5 1 -file /tmp/app-sample.txt
+```
+
 ## Defaults recipes
 
 The `.app` stores preferences under its bundle ID; `swift run` uses a different
@@ -251,6 +289,8 @@ a fresh domain on a throwaway user account or a VM.
    folders) survives.
 8. If `WindowFrameAutosaver` or the window scene changed, record the launch and
    confirm the first visible frame is already the saved one.
+9. If the change adds timers, watchers or scans, measure idle and active CPU
+   before and after.
 
 ## Extending this playbook
 

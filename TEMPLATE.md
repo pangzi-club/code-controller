@@ -57,3 +57,5 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
   temporary directory so `#Preview` never depends on a developer's home path.
 - 2026-10-30 — tooling: `.vscode/launch.json` Debug/Release targets;
   `rename.sh` rewrites the target names with the rest of the app.
+- 2026-10-30 — docs: the UI playbook now includes the cumulative-CPU
+  measurement recipe and `sample` profiling.
