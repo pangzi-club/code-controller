@@ -157,7 +157,7 @@ struct FileListView: View {
 
 #Preview {
     FileListView(
-        folder: Folder(id: UUID(), url: URL(fileURLWithPath: "/Users/bohaowang/Workspace/App/swiftui-starter"))
+        folder: Folder(id: UUID(), url: PreviewFixtures.sampleFolder)
     )
     .frame(width: 600, height: 500)
 }

@@ -51,7 +51,7 @@ swift test    # 或：make test
 
 ## Xcode Preview
 
-用 Xcode 打开 `Package.swift`（scheme 由 Xcode 自动生成；`.swiftpm/` 已被 gitignore）。包内有两个 target：**DemoExplorer** library 包含全部视图、模型和 store；**DemoExplorerApp** executable 只保留 `@main` 入口。Preview 必须依赖 library 产物 —— 命令行工具类型的 target 无法驱动画布 —— 因此各视图文件末尾的 `#Preview` 都走 library scheme。executable target 要用到的类型需要标记 `public`。
+用 Xcode 打开 `Package.swift`（scheme 由 Xcode 自动生成；`.swiftpm/` 已被 gitignore）。包内有两个 target：**DemoExplorer** library 包含全部视图、模型和 store；**DemoExplorerApp** executable 只保留 `@main` 入口。Preview 必须依赖 library 产物 —— 命令行工具类型的 target 无法驱动画布 —— 因此各视图文件末尾的 `#Preview` 都走 library scheme。executable target 要用到的类型需要标记 `public`。需要文件数据的 Preview 使用 `PreviewFixtures`，它在临时目录里生成示例文件夹，而不是指向开发者本机路径。
 
 ## 作为模板使用
 
@@ -102,6 +102,7 @@ Sources/
 │   ├── FolderStore.swift         # 侧边栏文件夹列表 + security-scoped bookmark
 │   ├── Log.swift                 # 统一日志 + 轮转文件日志
 │   ├── Models.swift              # 文件加载、打开/定位助手、文件夹选择器
+│   ├── PreviewFixtures.swift     # 仅 DEBUG 的 Xcode Preview 示例文件夹
 │   ├── L10n.swift                # 本地化辅助
 │   ├── SettingsStore.swift       # 主题 + 语言偏好与持久化
 │   ├── SettingsView.swift        # 设置窗口内容（主题 + 语言切换）

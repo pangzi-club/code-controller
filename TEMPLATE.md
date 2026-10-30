@@ -52,3 +52,5 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
   `template-diff.sh` now matches files under a renamed library target.
 - 2026-10-30 — localization: `LocalizationTests` checks key parity, empty
   values and every enum label key in `swift test`.
+- 2026-10-30 — previews: `PreviewFixtures` builds a sample folder under the
+  temporary directory so `#Preview` never depends on a developer's home path.

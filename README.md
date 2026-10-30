@@ -71,7 +71,9 @@ all views, models and stores, and the **DemoExplorerApp** executable that only
 holds the `@main` entry point. Previews need a library product — a
 command-line-tool target cannot power the canvas — so the views (each file
 ends in a `#Preview` block) preview against the library scheme. Types used by
-the executable target must be `public`.
+the executable target must be `public`. Previews that need files use
+`PreviewFixtures`, which builds a sample folder under the temporary directory
+instead of pointing at a developer's home path.
 
 ## Using This as a Template
 
@@ -158,6 +160,7 @@ Sources/
 │   ├── FolderStore.swift         # Sidebar folder list + security-scoped bookmarks
 │   ├── Log.swift                 # Unified logging + rotating file log
 │   ├── Models.swift              # File loading, open/reveal helpers, folder picker
+│   ├── PreviewFixtures.swift     # DEBUG-only sample folder for Xcode Previews
 │   ├── L10n.swift                # Localization helpers
 │   ├── SettingsStore.swift       # Theme + language preferences and persistence
 │   ├── SettingsView.swift        # Settings window content (theme + language pickers)

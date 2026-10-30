@@ -12,7 +12,9 @@ The package has two targets: a **library** (`DemoExplorer`, all the views,
 models, stores and helpers) and a thin **executable** (`DemoExplorerApp`, just
 the `@main` entry point). Splitting them lets Xcode Previews work — open
 `Package.swift` in Xcode and preview with the library scheme; previews require
-a library product, not a command-line tool.
+a library product, not a command-line tool. Previews that need sample file
+system data use `PreviewFixtures` (DEBUG-only, under the temporary directory)
+instead of a developer's home path.
 
 ## Commands
 
