@@ -155,11 +155,9 @@ private struct PlaceholderView: View {
 private struct SidebarView: View {
     @ObservedObject var store: FolderStore
     @Binding var selection: SidebarSelection?
-    @Environment(\.openWindow) private var openWindow
 
     @State private var hoveredFolderID: UUID?
     @State private var addHovered = false
-    @State private var settingsHovered = false
     @State private var dropTargeted = false
 
     private var selectedFolderID: UUID? {
@@ -228,11 +226,10 @@ private struct SidebarView: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                addButton
-                settingsButton
-            }
-            .padding(12)
+            addButton
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 12)
         }
         // The sidebar is drawn under the transparent titlebar; reserve the
         // traffic-light strip in the header padding instead of letting
@@ -270,48 +267,31 @@ private struct SidebarView: View {
                 selection = .folder(folder.id)
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(addHovered ? .primary : .secondary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.primary.opacity(0.06))
+                    )
                 l10n("Add Folder")
                     .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.secondary)
+                Spacer(minLength: 0)
             }
-            .foregroundColor(addHovered ? .accentColor : .secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(
-                        Color.primary.opacity(addHovered ? 0.35 : 0.15),
-                        style: StrokeStyle(lineWidth: 1, dash: [5, 3])
-                    )
+                    .fill(addHovered ? Color.primary.opacity(0.05) : Color.clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { addHovered = $0 }
-    }
-
-    private var settingsButton: some View {
-        Button {
-            openWindow(id: "settings")
-        } label: {
-            Image(systemName: "gearshape")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(settingsHovered ? .accentColor : .secondary)
-                .frame(width: 38, height: 38)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(
-                            Color.primary.opacity(settingsHovered ? 0.35 : 0.15),
-                            style: StrokeStyle(lineWidth: 1, dash: [5, 3])
-                        )
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { settingsHovered = $0 }
-        .help(l10nString("Settings"))
     }
 }
 

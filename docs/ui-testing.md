@@ -150,8 +150,9 @@ lands; the first visible frame should already be the saved size.
 
 ## Settings window, focus ring and window state
 
-1. Open Settings with the sidebar gear and with ⌘, — both must open the same
-   single window (a second attempt focuses it, never duplicates it).
+1. Open Settings from the App menu (⌘,) — a second attempt must focus the same
+   single window, never duplicate it. The sidebar footer should only offer
+   Add Folder; settings has no second in-window entry.
 2. The window is fixed-size and centered; resizing must be disabled.
 3. Close the settings window, then close and reopen the main window (⌘N). The
    main window frame and the sidebar selection state should survive.

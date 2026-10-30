@@ -89,10 +89,11 @@ instead of a developer's home path.
   clamp / default) has tests.
 - **Settings is a separate window**, not a page inside the main window: a
   single-instance `Window` scene (`id: "settings"`, fixed content size,
-  centered). The sidebar gear opens it via `@Environment(\.openWindow)`;
-  the ⌘, menu item (`CommandGroup(replacing: .appSettings)`) posts the
-  `openSettingsWindow` notification, which ContentView forwards to
-  `openWindow` — commands can't reach the environment action themselves.
+  centered). The standard App menu item (⌘,,
+  `CommandGroup(replacing: .appSettings)`) posts the `openSettingsWindow`
+  notification, which ContentView forwards to `openWindow` — commands can't
+  reach the environment action themselves. Do not add a second in-window
+  settings button; the app menu is the single entry point.
   Do NOT switch to a `Settings` scene: opening it programmatically is
   macOS 14+ API, and its undocumented `showSettingsWindow:` selector was
   verified to do nothing here. The window opts out of state restoration
