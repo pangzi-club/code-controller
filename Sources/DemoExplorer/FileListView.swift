@@ -155,9 +155,11 @@ struct FileListView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     FileListView(
         folder: Folder(id: UUID(), url: PreviewFixtures.sampleFolder)
     )
     .frame(width: 600, height: 500)
 }
+#endif
