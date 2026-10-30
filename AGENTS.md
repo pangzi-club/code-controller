@@ -193,11 +193,11 @@ instead of a developer's home path.
 `./Scripts/rename.sh NewName com.example.newid` renames everything in one
 shot: `Package.swift`, the `Sources/`/`Tests/` directories (the executable
 target becomes `NewNameApp`), the `@main` struct, `AppInfo.swift` identity,
-READMEs, `AGENTS.md` and `docs/`. It finishes by listing any file that still
-contains the old name, so configs or scripts added later are visible instead
-of silently stale. The Makefile and `make-app.sh` discover `AppInfo.swift`
-via `Sources/*/AppInfo.swift`, so they keep working across renames. The bundle
-ID defaults to `com.example.<NewName>` when omitted.
+READMEs, `AGENTS.md`, `docs/` and `.vscode/launch.json`. It finishes by listing
+any file that still contains the old name, so configs or scripts added later
+are visible instead of silently stale. The Makefile and `make-app.sh` discover
+`AppInfo.swift` via `Sources/*/AppInfo.swift`, so they keep working across
+renames. The bundle ID defaults to `com.example.<NewName>` when omitted.
 
 Forks should keep `TEMPLATE.md` up to date and use
 `make template-diff SOURCE=/path/to/swiftui-starter` to see changes in the

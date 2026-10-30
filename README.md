@@ -40,7 +40,8 @@ run), `make test`, `make check-l10n` (verify localization key parity),
 `make app` (assemble the distribution .app), `make launch` (assemble and open
 the dev build), `make mas` (App Store package), `make build`, `make rename`
 (template rename), `make template-diff` (show template drift), `make clean`.
-Run `make help` to list them.
+Run `make help` to list them. `.vscode/launch.json` provides Debug/Release
+launch targets for the VS Code Swift extension; `rename.sh` updates them.
 
 ## Verifying the UI
 
@@ -183,6 +184,7 @@ docs/
 └── ui-testing.md                 # AX + screencapture + CGEvent verification playbook
 TEMPLATE.md                       # Template version, managed files and merge rules
 AGENTS.md                         # Conventions and gotchas for humans and agents
+.vscode/launch.json               # Debug/Release targets for the VS Code Swift extension
 ```
 
 ## Localization Notes

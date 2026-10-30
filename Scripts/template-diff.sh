@@ -22,6 +22,7 @@ VERSION="$(sed -nE 's/^Template version:[[:space:]]*(.+)$/\1/p' "$SOURCE/TEMPLAT
 echo "==> Comparing against $SOURCE${VERSION:+ (template $VERSION)}"
 
 FILES=(
+    .vscode/launch.json
     Makefile
     Scripts/App.entitlements
     Scripts/check-l10n.py

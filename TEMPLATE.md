@@ -16,6 +16,7 @@ make template-diff SOURCE=/path/to/swiftui-starter
 The script is read-only. It prints a unified diff (upstream → local) for:
 
 - `Makefile`
+- `.vscode/launch.json`
 - `Scripts/App.entitlements`
 - `Scripts/check-l10n.py`
 - `Scripts/make-app.sh`
@@ -54,3 +55,5 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
   values and every enum label key in `swift test`.
 - 2026-10-30 — previews: `PreviewFixtures` builds a sample folder under the
   temporary directory so `#Preview` never depends on a developer's home path.
+- 2026-10-30 — tooling: `.vscode/launch.json` Debug/Release targets;
+  `rename.sh` rewrites the target names with the rest of the app.

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Renames the app template in one shot: package/target names in Package.swift,
 # the Sources/ and Tests/ directories, the @main entry file, the identity in
-# AppInfo.swift, and every mention in the READMEs, AGENTS.md and docs/.
+# AppInfo.swift, and every mention in the READMEs, AGENTS.md, docs/ and the
+# VS Code launch configuration.
 # Finishes by reporting any file that still contains the old name.
 #
 # Usage:
@@ -61,7 +62,7 @@ if [[ -f "Sources/${NEW}App/${OLD}App.swift" ]]; then
 fi
 
 # --- Replace every occurrence in docs and sources ------------------------------
-for f in Package.swift README.md README.ZH.md AGENTS.md; do
+for f in Package.swift README.md README.ZH.md AGENTS.md .vscode/launch.json; do
     [[ -f "$f" ]] && sed -i '' "s/$OLD/$NEW/g" "$f"
 done
 if [[ -d docs ]]; then

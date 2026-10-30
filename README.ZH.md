@@ -31,7 +31,7 @@ swift run
 swift test    # 或：make test
 ```
 
-项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装分发用 .app）、`make launch`（组装并打开开发版）、`make mas`（App Store 安装包）、`make build`、`make rename`（模板重命名）、`make template-diff`（查看与模板的差异）、`make clean`。运行 `make help` 查看全部。
+项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装分发用 .app）、`make launch`（组装并打开开发版）、`make mas`（App Store 安装包）、`make build`、`make rename`（模板重命名）、`make template-diff`（查看与模板的差异）、`make clean`。运行 `make help` 查看全部。`.vscode/launch.json` 提供 VS Code Swift 扩展的 Debug/Release 启动配置，`rename.sh` 会同步更新目标名。
 
 ## 验证 UI
 
@@ -125,6 +125,7 @@ docs/
 └── ui-testing.md                 # AX + screencapture + CGEvent 验证手册
 TEMPLATE.md                       # 模板版本、托管文件与合并规则
 AGENTS.md                         # 面向人和 agent 的约定与坑位说明
+.vscode/launch.json               # VS Code Swift 扩展的 Debug/Release 启动配置
 ```
 
 ## 本地化说明
