@@ -42,6 +42,7 @@ final class FolderStore: ObservableObject {
             let scoped = url.startAccessingSecurityScopedResource()
             guard FileManager.default.isReadableFile(atPath: url.path) else {
                 if scoped { url.stopAccessingSecurityScopedResource() }
+                Log.files.error("Dropping unreadable folder \(entry.path)")
                 continue
             }
             if scoped { scopedURLs.insert(url) }
@@ -65,6 +66,7 @@ final class FolderStore: ObservableObject {
         }
         let folder = Folder(id: UUID(), url: url)
         folders.append(folder)
+        Log.files.notice("Add folder \(url.path)")
         return folder
     }
 
@@ -74,6 +76,7 @@ final class FolderStore: ObservableObject {
             url.stopAccessingSecurityScopedResource()
         }
         folders.removeAll { $0.id == folder.id }
+        Log.files.notice("Remove folder \(folder.url.path)")
     }
 
     private func persist() {

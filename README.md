@@ -15,6 +15,7 @@ the box.
 - **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide — a separate fixed-size window opened with ⌘, (App menu) or the sidebar gear.
 - **Persistence**: the folder list is stored as security-scoped bookmarks in UserDefaults (sandbox-safe across relaunches; stale folders are dropped), and the window frame survives relaunches.
 - **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
+- **Diagnostics**: structured unified logging mirrored to a rotating file log, with a launch banner that records the bundle, sandbox and log paths.
 - Adapts to light and dark appearance.
 
 ## Running
@@ -48,6 +49,19 @@ focus rings, empty states, dark mode and localization only exist in the
 assembled app — always verify them on `make app` output, not the bare
 `swift run` binary. `docs/ui-testing.md` is the AX + `screencapture` + CGEvent
 playbook, including the helper sources and the per-change checklist.
+
+## Diagnostics
+
+`Log` writes to unified logging (subsystem = bundle ID) and mirrors every line
+to `~/Library/Logs/<display name>/app.log`, rotated to `app.log.1` when it
+exceeds 2 MB at launch. The sandboxed `.app` keeps the same path inside its
+container (`~/Library/Containers/<bundleID>/Data/Library/Logs/...`).
+`Log.bootstrap()` records the bundle, sandbox and log paths before the first
+window appears. Stream live with:
+
+```sh
+/usr/bin/log stream --predicate 'subsystem == "<bundleID>"' --level debug
+```
 
 ## Xcode Previews
 
@@ -142,6 +156,7 @@ Sources/
 │   ├── ContentView.swift         # Split layout with sidebar and detail pane
 │   ├── FileListView.swift        # Card-style file list
 │   ├── FolderStore.swift         # Sidebar folder list + security-scoped bookmarks
+│   ├── Log.swift                 # Unified logging + rotating file log
 │   ├── Models.swift              # File loading, open/reveal helpers, folder picker
 │   ├── L10n.swift                # Localization helpers
 │   ├── SettingsStore.swift       # Theme + language preferences and persistence

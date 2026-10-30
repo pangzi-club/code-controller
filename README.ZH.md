@@ -12,6 +12,7 @@
 - **设置窗口**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局——独立固定尺寸窗口，⌘,（App 菜单）或侧边栏齿轮均可打开。
 - **持久化**：文件夹列表以 security-scoped bookmark 的形式存于 UserDefaults（沙盒环境下重启仍可访问；失效文件夹会被过滤），窗口位置和大小跨启动保留。
 - **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
+- **诊断**：结构化统一日志会同步写入轮转文件日志，启动横幅会记录 bundle、沙盒和日志路径。
 - 自动适配浅色 / 深色外观。
 
 ## 运行
@@ -35,6 +36,18 @@ swift test    # 或：make test
 ## 验证 UI
 
 单元测试只覆盖纯逻辑。窗口帧恢复、设置窗口、焦点环、空状态、深色模式和本地化只存在于组装后的应用里 —— 务必用 `make app` 的产物验证，而不是裸 `swift run` 二进制。`docs/ui-testing.md` 是 AX + `screencapture` + CGEvent 的验证手册，包含辅助脚本源码和每次改动的检查清单。
+
+## 诊断
+
+`Log` 会把日志写入统一日志（subsystem = bundle ID），并同步镜像到
+`~/Library/Logs/<显示名>/app.log`；启动时若文件超过 2 MB，会轮转为
+`app.log.1`。沙盒 `.app` 的路径位于容器内
+（`~/Library/Containers/<bundleID>/Data/Library/Logs/...`）。`Log.bootstrap()`
+会在首个窗口出现前记录 bundle、沙盒和日志路径。实时查看：
+
+```sh
+/usr/bin/log stream --predicate 'subsystem == "<bundleID>"' --level debug
+```
 
 ## Xcode Preview
 
@@ -87,6 +100,7 @@ Sources/
 │   ├── ContentView.swift         # 分栏布局：侧边栏 + 详情页
 │   ├── FileListView.swift        # 卡片式文件列表
 │   ├── FolderStore.swift         # 侧边栏文件夹列表 + security-scoped bookmark
+│   ├── Log.swift                 # 统一日志 + 轮转文件日志
 │   ├── Models.swift              # 文件加载、打开/定位助手、文件夹选择器
 │   ├── L10n.swift                # 本地化辅助
 │   ├── SettingsStore.swift       # 主题 + 语言偏好与持久化

@@ -54,20 +54,32 @@ for file in "${FILES[@]}"; do
     fi
 done
 
-# The privacy manifest lives under the library target, whose name changes with
-# Scripts/rename.sh, so compare it by pattern.
-for local in "$ROOT"/Sources/*/Resources/PrivacyInfo.xcprivacy; do
-    [[ -f "$local" ]] || continue
-    relative="${local#"$ROOT"/}"
-    upstream="$SOURCE/$relative"
-    [[ -f "$upstream" ]] || continue
-    if ! cmp -s "$upstream" "$local"; then
+# The privacy manifest and the logging helper live under the library target,
+# whose name changes with Scripts/rename.sh, so locate the upstream file by
+# name instead of by the local relative path.
+compare_by_basename() {
+    local pattern="$1"
+    local upstream
+    upstream="$(ls "$SOURCE"/$pattern 2>/dev/null | head -1)"
+    [[ -n "$upstream" ]] || return 0
+    local local_file
+    local_file="$(ls "$ROOT"/$pattern 2>/dev/null | head -1)"
+    if [[ -z "$local_file" ]]; then
         echo
-        echo "=== $relative (upstream → local) ==="
-        diff -u -L "upstream/$relative" -L "local/$relative" "$upstream" "$local" || true
+        echo "=== $pattern: missing locally ==="
+        status=1
+        return 0
+    fi
+    if ! cmp -s "$upstream" "$local_file"; then
+        echo
+        echo "=== $pattern (upstream → local) ==="
+        diff -u -L "upstream/$pattern" -L "local/$pattern" "$upstream" "$local_file" || true
         status=1
     fi
-done
+}
+
+compare_by_basename 'Sources/*/Log.swift'
+compare_by_basename 'Sources/*/Resources/PrivacyInfo.xcprivacy'
 
 if [[ "$status" -eq 0 ]]; then
     echo "ok: template-managed files match"

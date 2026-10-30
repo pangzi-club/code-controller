@@ -22,6 +22,7 @@ The script is read-only. It prints a unified diff (upstream → local) for:
 - `Scripts/make-icon.swift`
 - `Scripts/rename.sh`
 - `docs/ui-testing.md`
+- `Sources/*/Log.swift`
 - `Sources/*/Resources/PrivacyInfo.xcprivacy`
 
 `AGENTS.md` and `Package.swift` are intentionally not diffed: both carry
@@ -46,3 +47,6 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
 - 2026-10-30 — distribution pipeline: build number, `DEV=1` / `MAS=1` modes,
   universal builds, hardened runtime, App Sandbox entitlements, privacy
   manifest, App Store `.pkg`; `Scripts/template-diff.sh` and this file.
+- 2026-10-30 — diagnostics: `Log` writes unified logging plus a rotating file
+  log, and `Log.bootstrap()` records the bundle, sandbox and log paths;
+  `template-diff.sh` now matches files under a renamed library target.

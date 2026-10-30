@@ -6,6 +6,10 @@ import SwiftUI
 struct DemoExplorerApp: App {
     @StateObject private var settings = SettingsStore()
 
+    init() {
+        Log.bootstrap()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

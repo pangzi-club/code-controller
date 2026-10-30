@@ -132,9 +132,13 @@ public struct WindowFrameAutosaver: NSViewRepresentable {
             from: UserDefaults.standard.string(forKey: WindowFramePersistence.frameKey)
         )
         if let saved, WindowFramePersistence.isRestorable(saved, screens: screens) {
-            window.setFrame(WindowFramePersistence.clamped(saved, to: screens), display: true)
+            let frame = WindowFramePersistence.clamped(saved, to: screens)
+            window.setFrame(frame, display: true)
+            Log.window.debug("Restored frame \(NSStringFromRect(frame))")
         } else {
-            window.setFrame(WindowFramePersistence.defaultFrame(in: defaultScreen), display: true)
+            let frame = WindowFramePersistence.defaultFrame(in: defaultScreen)
+            window.setFrame(frame, display: true)
+            Log.window.debug("Applied default frame \(NSStringFromRect(frame))")
         }
     }
 

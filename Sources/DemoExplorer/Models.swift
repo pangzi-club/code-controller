@@ -17,10 +17,16 @@ enum FileLoader {
     /// dot-files are hidden.
     static func load(from folder: URL) -> [FileItem]? {
         let fileManager = FileManager.default
-        guard let entries = try? fileManager.contentsOfDirectory(
-            at: folder,
-            includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
-        ) else { return nil }
+        let entries: [URL]
+        do {
+            entries = try fileManager.contentsOfDirectory(
+                at: folder,
+                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
+            )
+        } catch {
+            Log.files.error("Could not list \(folder.path): \(error.localizedDescription)")
+            return nil
+        }
 
         let items = entries
             .filter { !$0.lastPathComponent.hasPrefix(".") }

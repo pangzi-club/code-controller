@@ -51,6 +51,18 @@ a library product, not a command-line tool.
   `screencapture` + CGEvent playbook for verifying the assembled `.app`:
   window frame restoration, the settings window, focus rings, empty states,
   dark mode and localization.
+- **Logging** goes through `Log` (`Log.swift`) — never `print`. Every call
+  writes unified logging (subsystem = `AppInfo.bundleID`) and mirrors to
+  `Library/Logs/<displayName>/app.log` (rotated to `app.log.1` at 2 MB per
+  launch) — the real `~/Library/Logs/...` for `swift run`, the container's
+  `~/Library/Containers/<bundleID>/Data/Library/Logs/...` for the sandboxed
+  .app. `Log.bootstrap()` runs from the `@main` initializer and records the
+  bundle, sandbox and log paths. Use the matching category (`app`, `files`,
+  `window`), and log the underlying error before mapping it to a user-facing
+  failure. Stream it with
+  `/usr/bin/log stream --predicate 'subsystem == "<bundleID>"' --level debug`
+  (the `/usr/bin/` prefix dodges zsh's builtin `log`). Crash reports come from
+  macOS: `~/Library/Logs/DiagnosticReports/<executable target>-*.ips`.
 - **Tests** use Swift Testing (`import Testing`, `@Test`, `#expect`) and live
   in `Tests/DemoExplorerTests/`. Add tests for new logic in `Models.swift`,
   stores, and helpers; views don't need snapshot tests in this template.
@@ -100,9 +112,9 @@ a library product, not a command-line tool.
   (`CFBundleVersion`); `CFBundleShortVersionString` comes from `version`.
   `LSMinimumSystemVersion` is parsed from `Package.swift`.
 - `Sources/*/Resources/PrivacyInfo.xcprivacy` declares the required-reason APIs
-  (UserDefaults `CA92.1`; file timestamps `DDA9.1` / `3B52.1`). Update it
-  whenever a new required-reason API appears; `make-app.sh` copies it to the
-  app's top-level `Contents/Resources`.
+  (UserDefaults `CA92.1`; file timestamps `DDA9.1` / `3B52.1` / `C617.1`).
+  Update it whenever a new required-reason API appears; `make-app.sh` copies it
+  to the app's top-level `Contents/Resources`.
 - **Dev builds use a separate identity**: `DEV=1` (what `make launch` runs)
   appends `.dev` to the bundle ID and " Dev" to the display name. TCC grants,
   UserDefaults and the sandbox container are keyed by bundle ID, so the dev
