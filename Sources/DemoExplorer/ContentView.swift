@@ -11,6 +11,7 @@ public struct ContentView: View {
     @State private var selection: SidebarSelection?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var toolbarStripHeight: CGFloat = 52
+    @State private var isFullScreen = false
     @State private var isChoosingFolder = false
 
     public init() {}
@@ -33,6 +34,7 @@ public struct ContentView: View {
         .navigationSplitViewStyle(.balanced)
         .background(pageColor)
         .toolbarBackground(.hidden, for: .windowToolbar)
+        .toolbar(isFullScreen ? .hidden : .visible, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: toggleSidebar) {
@@ -60,6 +62,7 @@ public struct ContentView: View {
                     }
             }
         )
+        .background(WindowFullScreenReader(isFullScreen: $isFullScreen))
         .onAppear {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
@@ -85,8 +88,7 @@ public struct ContentView: View {
     }
 
     /// Keeps the page-colored strip above the detail column in sync with the
-    /// window toolbar; the sidebar must stay transparent all the way to the
-    /// traffic lights, so the toolbar background itself is hidden.
+    /// transparent toolbar.
     private func updateToolbarStrip(_ height: CGFloat) {
         let clamped = max(0, height)
         guard abs(clamped - toolbarStripHeight) > 0.5 else { return }
@@ -98,7 +100,11 @@ public struct ContentView: View {
         switch selection {
         case .folder(let id):
             if let folder = store.folders.first(where: { $0.id == id }) {
-                FileListView(folder: folder)
+                FileListView(
+                    folder: folder,
+                    showsFullScreenToolbar: isFullScreen,
+                    toggleSidebar: toggleSidebar
+                )
                     .id(folder.id)
             } else {
                 placeholder
@@ -109,8 +115,15 @@ public struct ContentView: View {
     }
 
     private var placeholder: some View {
-        PlaceholderView(hasFolders: !store.folders.isEmpty) {
-            presentFolderPicker()
+        VStack(spacing: 0) {
+            if isFullScreen {
+                InlineWindowToolbar(title: nil, toggleSidebar: toggleSidebar) {
+                    EmptyView()
+                }
+            }
+            PlaceholderView(hasFolders: !store.folders.isEmpty) {
+                presentFolderPicker()
+            }
         }
     }
 
@@ -121,6 +134,113 @@ public struct ContentView: View {
     private func toggleSidebar() {
         withAnimation {
             columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        }
+    }
+}
+
+private struct WindowFullScreenReader: NSViewRepresentable {
+    @Binding var isFullScreen: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isFullScreen: $isFullScreen)
+    }
+
+    func makeNSView(context: Context) -> WindowTrackingView {
+        let view = WindowTrackingView()
+        view.onWindowChange = { [weak coordinator = context.coordinator] window in
+            coordinator?.attach(to: window)
+        }
+        return view
+    }
+
+    func updateNSView(_ view: WindowTrackingView, context: Context) {
+        context.coordinator.isFullScreen = $isFullScreen
+        context.coordinator.attach(to: view.window)
+    }
+
+    static func dismantleNSView(_ view: WindowTrackingView, coordinator: Coordinator) {
+        view.onWindowChange = nil
+        coordinator.attach(to: nil)
+    }
+
+    final class Coordinator {
+        var isFullScreen: Binding<Bool>
+
+        private weak var window: NSWindow?
+        private var observations: [NSObjectProtocol] = []
+
+        init(isFullScreen: Binding<Bool>) {
+            self.isFullScreen = isFullScreen
+        }
+
+        deinit {
+            removeObservations()
+        }
+
+        func attach(to window: NSWindow?) {
+            if self.window === window {
+                if let window {
+                    publish(window.styleMask.contains(.fullScreen))
+                }
+                return
+            }
+            removeObservations()
+            self.window = window
+
+            guard let window else { return }
+
+            publish(window.styleMask.contains(.fullScreen))
+            DispatchQueue.main.async { [weak self, weak window] in
+                if let window {
+                    self?.publish(window.styleMask.contains(.fullScreen))
+                }
+            }
+
+            let center = NotificationCenter.default
+            observations.append(center.addObserver(
+                forName: NSWindow.willEnterFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self, weak window] _ in
+                if window != nil { self?.publish(true) }
+            })
+            observations.append(center.addObserver(
+                forName: NSWindow.didEnterFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self, weak window] _ in
+                if window != nil { self?.publish(true) }
+            })
+            observations.append(center.addObserver(
+                forName: NSWindow.didExitFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self, weak window] _ in
+                if window != nil { self?.publish(false) }
+            })
+        }
+
+        private func publish(_ value: Bool) {
+            guard isFullScreen.wrappedValue != value else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isFullScreen.wrappedValue != value else { return }
+                self.isFullScreen.wrappedValue = value
+            }
+        }
+
+        private func removeObservations() {
+            let center = NotificationCenter.default
+            observations.forEach(center.removeObserver)
+            observations.removeAll()
+        }
+    }
+
+    final class WindowTrackingView: NSView {
+        var onWindowChange: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindowChange?(window)
         }
     }
 }

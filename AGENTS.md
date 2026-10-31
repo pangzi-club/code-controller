@@ -220,10 +220,11 @@ lights. Keep these coordinated:
 - `SidebarView` ignores the top safe area and reserves the traffic-light strip
   in its header padding. `NavigationSplitView` would otherwise add its own top
   inset on top of the titlebar safe area, doubling the spacing.
-- `ContentView` hides the window toolbar background, removes the system
-  sidebar toggle, and overlays the page color on the detail column at the
-  root's top safe-area inset, so scrolled content does not show through the
-  toolbar controls.
+- `ContentView` hides the window toolbar background, removes the system sidebar
+  toggle, and overlays the page color on the detail column at the root's top
+  safe-area inset, so scrolled content does not show through the toolbar
+  controls. Full screen hides the native toolbar (AppKit forces a glass band
+  there) and uses `InlineWindowToolbar` inside the content instead.
 - `hiddenTitleBar` leaves the toolbar without a trailing flexible region:
   keep a `ToolbarItem { Spacer() }` before the `.primaryAction` group, or the
   actions pack next to the title instead of the right edge.

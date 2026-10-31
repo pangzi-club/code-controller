@@ -1,14 +1,86 @@
 import SwiftUI
 
+struct InlineWindowToolbar<Trailing: View>: View {
+    let title: String?
+    let toggleSidebar: () -> Void
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 12) {
+            toolbarButton(
+                systemName: "sidebar.leading",
+                help: "Toggle Sidebar",
+                action: toggleSidebar
+            )
+
+            if let title {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+            trailing
+        }
+        .padding(.horizontal, 20)
+        .frame(height: 52)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private func toolbarButton(
+        systemName: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .frame(width: 16, height: 16)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(l10n(help))
+        .focusEffectDisabled()
+    }
+}
+
 struct FileListView: View {
     let folder: Folder
+    let showsFullScreenToolbar: Bool
+    let toggleSidebar: () -> Void
 
     @State private var items: [FileItem] = []
     @State private var loadFailed = false
     @State private var hoveredItemID: String?
 
+    init(
+        folder: Folder,
+        showsFullScreenToolbar: Bool = false,
+        toggleSidebar: @escaping () -> Void = {}
+    ) {
+        self.folder = folder
+        self.showsFullScreenToolbar = showsFullScreenToolbar
+        self.toggleSidebar = toggleSidebar
+    }
+
     var body: some View {
         VStack(spacing: 0) {
+            if showsFullScreenToolbar {
+                InlineWindowToolbar(title: folder.name, toggleSidebar: toggleSidebar) {
+                    HStack(spacing: 8) {
+                        inlineToolbarButton(
+                            systemName: "arrow.up.forward.app",
+                            help: "Show in Finder"
+                        ) {
+                            FileOpener.reveal(folder.url)
+                        }
+                        inlineToolbarButton(systemName: "arrow.clockwise", help: "Refresh") {
+                            reload()
+                        }
+                    }
+                }
+            }
+
             if !loadFailed {
                 HStack {
                     l10n("%lld items", items.count)
@@ -101,6 +173,22 @@ struct FileListView: View {
             items = []
             loadFailed = true
         }
+    }
+
+    private func inlineToolbarButton(
+        systemName: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .frame(width: 16, height: 16)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(l10n(help))
+        .focusEffectDisabled()
     }
 
     private var cardShape: some View {

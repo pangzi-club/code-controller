@@ -165,6 +165,10 @@ first visible frame should already be the saved size.
 5. The sidebar must stay translucent all the way to the window's top edge,
    with the traffic lights floating over it. Scroll the detail pane: content
    must not show through the toolbar (the page-colored strip covers it).
+6. Enter full screen: the native toolbar must be replaced by the inline content
+   toolbar, with no glass band or clipped sidebar header. Confirm that its
+   sidebar, Finder and refresh buttons work. Exit full screen and confirm that
+   the native toolbar and titlebar treatment return.
 
 ## Appearance and localization
 
