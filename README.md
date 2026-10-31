@@ -13,7 +13,7 @@ the box.
 - **File list**: card-style list of the selected folder's direct children (directories first, then by name) with system icons, file size, and modification date. Hover highlighting included.
 - **Opening files**: double-click a file to open it with the system default app; the context menu also offers "Open" and "Show in Finder".
 - **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide — a separate fixed-size window opened with ⌘, from the App menu.
-- **Persistence**: the folder list is stored as security-scoped bookmarks in UserDefaults (so the sandboxed App Store build keeps access across relaunches; stale folders are dropped), and the window frame survives relaunches.
+- **Persistence**: the folder list is stored as security-scoped bookmarks in UserDefaults (so the sandboxed App Store build keeps access across relaunches; stale folders are dropped), and the system restores the window frame across relaunches.
 - **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
 - **Diagnostics**: structured unified logging mirrored to a rotating file log, with a launch banner that records the bundle, sandbox and log paths.
 - Adapts to light and dark appearance.
@@ -161,12 +161,11 @@ Sources/
 │   ├── FileListView.swift        # Card-style file list
 │   ├── FolderStore.swift         # Sidebar folder list + security-scoped bookmarks
 │   ├── Log.swift                 # Unified logging + rotating file log
-│   ├── Models.swift              # File loading, open/reveal helpers, folder picker
+│   ├── Models.swift              # File loading and open/reveal helpers
 │   ├── PreviewFixtures.swift     # DEBUG-only sample folder for Xcode Previews
 │   ├── L10n.swift                # Localization helpers
 │   ├── SettingsStore.swift       # Theme + language preferences and persistence
 │   ├── SettingsView.swift        # Settings window content (theme + language pickers)
-│   ├── WindowFrameAutosaver.swift # Manual window frame save/restore (tested pure logic)
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
 │       ├── zh-Hans.lproj/Localizable.strings

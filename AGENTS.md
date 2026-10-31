@@ -79,27 +79,20 @@ instead of a developer's home path.
   list stores app-scoped security bookmarks under `folderBookmarks` (not plain
   paths), so the sandboxed App Store build keeps access across relaunch;
   `FolderStore` starts each scope on launch and stops it when the folder is
-  removed. Local builds are unsandboxed but resolve the same bookmarks. The
-  main window frame persists through `WindowFrameAutosaver` — manual
-  save/restore under the fixed UserDefaults key `mainWindowFrame`, bypassing
-  NSWindow autosave so `swift run` and the .app behave identically. It
-  captures the window synchronously in `viewWillMove(toWindow:)`, hides it,
-  restores the frame, then reveals it, so SwiftUI's default size never
-  flashes. The pure logic in `WindowFramePersistence` (parse / restorable /
-  clamp / default) has tests.
+  removed. Local builds are unsandboxed but resolve the same bookmarks. Window
+  geometry is owned by SwiftUI/NSWindow restoration:
+  `.defaultSize(1080×720)` and `.defaultPosition(.center)` apply on first
+  launch, and the system restores the frame on later launches. Do not add a
+  second frame store in UserDefaults.
 - **Settings is a separate window**, not a page inside the main window: a
-  single-instance `Window` scene (`id: "settings"`, fixed content size,
-  centered). The standard App menu item (⌘,,
-  `CommandGroup(replacing: .appSettings)`) posts the `openSettingsWindow`
-  notification, which ContentView forwards to `openWindow` — commands can't
-  reach the environment action themselves. Do not add a second in-window
-  settings button; the app menu is the single entry point.
-  Do NOT switch to a `Settings` scene: opening it programmatically is
-  macOS 14+ API, and its undocumented `showSettingsWindow:` selector was
-  verified to do nothing here. The window opts out of state restoration
-  (`window.isRestorable = false` in `SettingsWindowRestorationDisabler`),
-  because a plain `Window` scene would otherwise reopen at launch when it
-  was open at quit.
+  standard SwiftUI `Settings` scene (singleton, fixed to its content size,
+  centered, opened from the App menu with ⌘,). The App menu is the single
+  entry point; do not add an in-window settings button. The scene opens only
+  on demand and is not restored at launch. On macOS 13 there is no public
+  programmatic open action — a fork that needs a button should raise the
+  deployment target to macOS 14 for `openSettings` or keep the menu-only
+  entry. The standard menu item and window title follow the system language,
+  not the in-app language override.
 - **Access control**: the library target (`Sources/DemoExplorer/`) must mark
   types and members `public` when the executable target
   (`Sources/DemoExplorerApp/`) uses them. Protocol requirements (`body`,
@@ -162,11 +155,15 @@ instead of a developer's home path.
   focusable to take over, so the ring never clears by itself. ContentView
   routes the split view's `columnVisibility` through a custom binding that
   calls `makeFirstResponder(nil)` on every toggle, and once on appear.
-- SwiftUI shows a `WindowGroup` window at its own size before any async frame
-  restore lands, so a plain async `setFrame` makes the window visibly jump on
-  launch. `WindowFrameAutosaver` captures the window in
-  `viewWillMove(toWindow:)`, sets `alphaValue = 0`, restores the frame, then
-  reveals it. Keep that ordering; hiding after the restore has no effect.
+- SwiftUI window restoration keys the saved frame by the scene's content
+  type. A `private` top-level view (such as `TitlebarFlattener`) mangles to a
+  name containing a runtime address, so the autosave key changes every launch
+  and the frame is never restored. Keep `TitlebarFlattener` at internal
+  visibility and guard its name; make any new scene-content wrapper internal
+  too, or keep it off the window's content chain.
+- Test frame restoration on the assembled `.app` (`make launch` / `make app`).
+  An unbundled `swift run` binary has no bundle identity for system
+  restoration, so it does not provide a meaningful frame-persistence check.
 - SwiftUI `@FocusState` does not move first responder into a toolbar
   `TextField` on macOS. Wrap an `NSSearchField` in an `NSViewRepresentable`
   and call `makeFirstResponder` whenever its focus token changes; have the

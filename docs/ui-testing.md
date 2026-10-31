@@ -34,8 +34,9 @@ AppKit/SwiftUI surface.
 - **Coordinate spaces.** AX frames, `screencapture -R`, and CGEvent mouse
   positions use top-left origin. AppKit `NSWindow.frame` and
   `NSEvent.mouseLocation` use bottom-left. Convert before comparing.
-- **State restoration.** Relaunching may restore only the settings window.
-  Open the main window with ⌘N (File > New Window) when it is missing.
+- **State restoration.** The system restores the main window and its frame. If
+  the main window was closed at quit, open it with ⌘N. The Settings scene is
+  never restored on its own; open it with ⌘,.
 - **Leave no traces.** Quit the app, restore dark mode, delete test `defaults`
   (from the sandbox container when testing the App Store build), and remove
   temporary logs when finished.
@@ -143,10 +144,11 @@ swift /tmp/frames.swift /tmp/launch.mov
 Frames land in `/tmp/launchframes/`. Open the frames immediately before and
 after the first visible window; a window-size flash is easy to miss live.
 
-Case note: this is how a real launch resize bug was caught — the window
-appeared at the SwiftUI default size for two frames and then jumped to the
-saved frame. `WindowFrameAutosaver` now hides the window until the restore
-lands; the first visible frame should already be the saved size.
+Case note: the window frame is restored by SwiftUI/NSWindow before the window
+is displayed. A default-size frame followed by a jump means the autosave key
+changed — the scene content type must keep a stable name, so keep
+`TitlebarFlattener` internal (a `private` type mangles to a per-launch
+address). The first visible frame should already be the saved size.
 
 ## Settings window, focus ring and window state
 
@@ -154,8 +156,8 @@ lands; the first visible frame should already be the saved size.
    single window, never duplicate it. The sidebar footer should only offer
    Add Folder; settings has no second in-window entry.
 2. The window is fixed-size and centered; resizing must be disabled.
-3. Close the settings window, then close and reopen the main window (⌘N). The
-   main window frame and the sidebar selection state should survive.
+3. Close the settings window, quit, and relaunch: the main window frame must
+   survive, and the Settings window must not reopen by itself.
 4. Click the toolbar sidebar toggle, then the detail pane: the toggle must not
    keep a blue focus ring after the sidebar changes. The same must hold right
    after launch.
@@ -269,7 +271,9 @@ its domain and container under `~/Library/Containers/<bundleID>/Data`;
 | `folderPaths` | Legacy sidebar paths, read only when no bookmarks exist |
 | `theme` | `system`, `light` or `dark` |
 | `language` | `en`, `zh-Hans`, or absent for Follow System |
-| `mainWindowFrame` | Saved frame (`NSStringFromRect` string) |
+
+Window frames are not an app key: SwiftUI stores them under
+`NSWindow Frame SwiftUI.WindowGroup<…>`.
 
 ```sh
 defaults delete "$APP_BUNDLE_ID"            # clean slate
@@ -292,8 +296,8 @@ a fresh domain on a throwaway user account or a VM.
 6. Check dark mode and the other UI language for new strings.
 7. Quit and relaunch — verify any persisted state (frame, theme, language,
    folders) survives.
-8. If `WindowFrameAutosaver` or the window scene changed, record the launch and
-   confirm the first visible frame is already the saved one.
+8. If the window scene changed, record the launch and confirm the first visible
+   frame is already the restored (or first-launch default) one.
 9. If the change adds timers, watchers or scans, measure idle and active CPU
    before and after.
 

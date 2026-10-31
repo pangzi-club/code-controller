@@ -10,7 +10,7 @@
 - **文件列表**：卡片式展示所选文件夹的直接子项（文件夹在前，再按名称排序），带系统图标、文件大小和修改时间，支持悬停高亮。
 - **打开文件**：双击用系统默认应用打开；右键菜单提供「打开」和「在 Finder 中显示」。
 - **设置窗口**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局——独立固定尺寸窗口，通过 App 菜单的 ⌘, 打开。
-- **持久化**：文件夹列表以 security-scoped bookmark 的形式存于 UserDefaults（App Store 沙盒构建在重启后仍可访问；失效文件夹会被过滤），窗口位置和大小跨启动保留。
+- **持久化**：文件夹列表以 security-scoped bookmark 的形式存于 UserDefaults（App Store 沙盒构建在重启后仍可访问；失效文件夹会被过滤），窗口框架由系统在重启后恢复。
 - **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
 - **诊断**：结构化统一日志会同步写入轮转文件日志，启动横幅会记录 bundle、沙盒和日志路径。
 - 自动适配浅色 / 深色外观。
@@ -101,12 +101,11 @@ Sources/
 │   ├── FileListView.swift        # 卡片式文件列表
 │   ├── FolderStore.swift         # 侧边栏文件夹列表 + security-scoped bookmark
 │   ├── Log.swift                 # 统一日志 + 轮转文件日志
-│   ├── Models.swift              # 文件加载、打开/定位助手、文件夹选择器
+│   ├── Models.swift              # 文件加载、打开/定位助手
 │   ├── PreviewFixtures.swift     # 仅 DEBUG 的 Xcode Preview 示例文件夹
 │   ├── L10n.swift                # 本地化辅助
 │   ├── SettingsStore.swift       # 主题 + 语言偏好与持久化
 │   ├── SettingsView.swift        # 设置窗口内容（主题 + 语言切换）
-│   ├── WindowFrameAutosaver.swift # 窗口位置手动保存/恢复（纯逻辑有测试）
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
 │       ├── zh-Hans.lproj/Localizable.strings

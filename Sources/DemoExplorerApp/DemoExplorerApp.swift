@@ -15,14 +15,11 @@ struct DemoExplorerApp: App {
             ContentView()
                 .environmentObject(settings)
                 .preferredColorScheme(settings.theme.colorScheme)
-                // minWidth/minHeight bound user resizing; WindowFrameAutosaver
-                // restores the persisted frame (or the centered default)
-                // before the window is first shown, so ideal* only applies on
-                // the very first launch.
-                .frame(minWidth: 760, idealWidth: 1080, minHeight: 500, idealHeight: 720)
-                .background(WindowFrameAutosaver.mainWindow)
+                .frame(minWidth: 760, minHeight: 500)
                 .background(TitlebarFlattener())
         }
+        .defaultSize(width: 1080, height: 720)
+        .defaultPosition(.center)
         .windowToolbarStyle(.unified(showsTitle: true))
 
         // A standard Settings scene: singleton, fixed to its content size,
@@ -39,7 +36,7 @@ struct DemoExplorerApp: App {
 /// Extends the content under the titlebar and makes the titlebar transparent,
 /// so the sidebar material reaches the traffic lights and the detail area shows
 /// the page color instead of a solid toolbar strip across the whole window.
-private struct TitlebarFlattener: NSViewRepresentable {
+struct TitlebarFlattener: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
