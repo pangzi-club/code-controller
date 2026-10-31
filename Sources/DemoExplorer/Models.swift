@@ -60,17 +60,3 @@ enum FileOpener {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 }
-
-enum FolderPicker {
-    @MainActor
-    static func chooseFolder() -> URL? {
-        let panel = NSOpenPanel()
-        panel.message = l10nString("Choose a folder")
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-        guard panel.runModal() == .OK else { return nil }
-        return panel.url
-    }
-}

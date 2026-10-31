@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// What the detail pane currently shows: the selected sidebar folder.
 enum SidebarSelection: Hashable {
@@ -11,13 +12,14 @@ public struct ContentView: View {
     @State private var selection: SidebarSelection?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var toolbarStripHeight: CGFloat = 52
+    @State private var isChoosingFolder = false
     @Environment(\.openWindow) private var openWindow
 
     public init() {}
 
     public var body: some View {
         NavigationSplitView(columnVisibility: columnVisibilityBinding) {
-            SidebarView(store: store, selection: $selection)
+            SidebarView(store: store, selection: $selection, onAddFolder: presentFolderPicker)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             detailContent
@@ -48,6 +50,19 @@ public struct ContentView: View {
                 selection = store.folders.first.map { .folder($0.id) }
             }
             dropSidebarToggleFocus()
+        }
+        .fileImporter(
+            isPresented: $isChoosingFolder,
+            allowedContentTypes: [.folder]
+        ) { result in
+            switch result {
+            case .success(let url):
+                if let folder = store.add(url) {
+                    selection = .folder(folder.id)
+                }
+            case .failure(let error):
+                Log.files.error("Folder picker failed: \(error.localizedDescription)")
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsWindow)) { _ in
             openWindow(id: "settings")
@@ -84,14 +99,12 @@ public struct ContentView: View {
 
     private var placeholder: some View {
         PlaceholderView(hasFolders: !store.folders.isEmpty) {
-            addFolderAndSelect()
+            presentFolderPicker()
         }
     }
 
-    private func addFolderAndSelect() {
-        if let url = FolderPicker.chooseFolder(), let folder = store.add(url) {
-            selection = .folder(folder.id)
-        }
+    private func presentFolderPicker() {
+        isChoosingFolder = true
     }
 
     /// The toolbar sidebar toggle keeps keyboard focus — and with it a
@@ -155,6 +168,7 @@ private struct PlaceholderView: View {
 private struct SidebarView: View {
     @ObservedObject var store: FolderStore
     @Binding var selection: SidebarSelection?
+    let onAddFolder: () -> Void
 
     @State private var hoveredFolderID: UUID?
     @State private var addHovered = false
@@ -262,11 +276,7 @@ private struct SidebarView: View {
     }
 
     private var addButton: some View {
-        Button {
-            if let url = FolderPicker.chooseFolder(), let folder = store.add(url) {
-                selection = .folder(folder.id)
-            }
-        } label: {
+        Button(action: onAddFolder) {
             HStack(spacing: 10) {
                 Image(systemName: "plus")
                     .font(.system(size: 12, weight: .semibold))
