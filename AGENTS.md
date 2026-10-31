@@ -231,6 +231,9 @@ lights. Keep these coordinated:
 - The toolbar adds 5pt leading / 8pt trailing margins. Extra 8pt leading and
   7pt trailing padding put the visible glyph edges on the list card's 20pt
   content inset; re-measure if the toolbar style changes.
+- `InlineWindowToolbar` uses 14pt horizontal padding around its 28pt buttons;
+  their centered 16pt glyphs then land on the same 20pt content inset. Keep
+  the button, glyph and outer-padding measurements coordinated.
 - Never paint an opaque background over the sidebar — the translucent material
   is the design. Panels that start below the toolbar must not ignore the top
   safe area.

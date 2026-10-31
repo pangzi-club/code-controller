@@ -22,7 +22,9 @@ struct InlineWindowToolbar<Trailing: View>: View {
             Spacer(minLength: 0)
             trailing
         }
-        .padding(.horizontal, 20)
+        // A 16pt glyph centered in a 28pt button needs 14pt outer padding
+        // for its visible edge to match the list card's 20pt inset.
+        .padding(.horizontal, 14)
         .frame(height: 52)
         .background(Color(nsColor: .controlBackgroundColor))
     }

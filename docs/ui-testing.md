@@ -167,8 +167,9 @@ first visible frame should already be the saved size.
    must not show through the toolbar (the page-colored strip covers it).
 6. Enter full screen: the native toolbar must be replaced by the inline content
    toolbar, with no glass band or clipped sidebar header. Confirm that its
-   sidebar, Finder and refresh buttons work. Exit full screen and confirm that
-   the native toolbar and titlebar treatment return.
+   sidebar, Finder and refresh buttons work, and that their visible glyphs stay
+   on the list card's 20pt content edges. Exit full screen and confirm that the
+   native toolbar and titlebar treatment return.
 
 ## Appearance and localization
 
