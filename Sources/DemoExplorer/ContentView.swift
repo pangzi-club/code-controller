@@ -326,12 +326,18 @@ private struct SidebarView: View {
                 ScrollView {
                     LazyVStack(spacing: 2) {
                         ForEach(store.folders) { folder in
-                            SidebarRowView(
-                                folder: folder,
-                                isSelected: folder.id == selectedFolderID,
-                                isHovered: folder.id == hoveredFolderID
-                            )
-                            .onTapGesture { selection = .folder(folder.id) }
+                            let isSelected = folder.id == selectedFolderID
+                            Button {
+                                selection = .folder(folder.id)
+                            } label: {
+                                SidebarRowView(
+                                    folder: folder,
+                                    isSelected: isSelected,
+                                    isHovered: folder.id == hoveredFolderID
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                             .onHover { hovering in
                                 hoveredFolderID = hovering ? folder.id : nil
                             }
@@ -478,7 +484,7 @@ extension URL {
     /// Replaces the home directory prefix with "~" for display.
     var abbreviatedPath: String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        guard path.hasPrefix(home) else { return path }
+        guard path == home || path.hasPrefix(home + "/") else { return path }
         return "~" + path.dropFirst(home.count)
     }
 }
