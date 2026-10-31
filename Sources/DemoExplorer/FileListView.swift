@@ -29,6 +29,11 @@ struct FileListView: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .navigationTitle(folder.name)
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Text(folder.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+            }
             ToolbarItemGroup {
                 Button {
                     FileOpener.reveal(folder.url)

@@ -146,9 +146,9 @@ after the first visible window; a window-size flash is easy to miss live.
 
 Case note: the window frame is restored by SwiftUI/NSWindow before the window
 is displayed. A default-size frame followed by a jump means the autosave key
-changed — the scene content type must keep a stable name, so keep
-`TitlebarFlattener` internal (a `private` type mangles to a per-launch
-address). The first visible frame should already be the saved size.
+changed — the scene content type must keep a stable name (keep top-level
+wrappers non-private; a `private` type mangles to a per-launch address). The
+first visible frame should already be the saved size.
 
 ## Settings window, focus ring and window state
 
@@ -158,9 +158,10 @@ address). The first visible frame should already be the saved size.
 2. The window is fixed-size and centered; resizing must be disabled.
 3. Close the settings window, quit, and relaunch: the main window frame must
    survive, and the Settings window must not reopen by itself.
-4. Click the toolbar sidebar toggle, then the detail pane: the toggle must not
-   keep a blue focus ring after the sidebar changes. The same must hold right
-   after launch.
+4. Click the custom toolbar sidebar toggle (the system toggle is removed and
+   the replacement uses `.focusEffectDisabled()`), then the detail pane: the
+   toggle must not keep a blue focus ring after the sidebar changes. The same
+   must hold right after launch.
 5. The sidebar must stay translucent all the way to the window's top edge,
    with the traffic lights floating over it. Scroll the detail pane: content
    must not show through the toolbar (the page-colored strip covers it).

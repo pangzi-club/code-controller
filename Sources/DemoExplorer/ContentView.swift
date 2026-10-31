@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -17,8 +16,9 @@ public struct ContentView: View {
     public init() {}
 
     public var body: some View {
-        NavigationSplitView(columnVisibility: columnVisibilityBinding) {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(store: store, selection: $selection, onAddFolder: presentFolderPicker)
+                .toolbar(removing: .sidebarToggle)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             detailContent
@@ -33,13 +33,27 @@ public struct ContentView: View {
         .navigationSplitViewStyle(.balanced)
         .background(pageColor)
         .toolbarBackground(.hidden, for: .windowToolbar)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: toggleSidebar) {
+                    Label {
+                        l10n("Toggle Sidebar")
+                    } icon: {
+                        Image(systemName: "sidebar.leading")
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .help(l10n("Toggle Sidebar"))
+                .focusEffectDisabled()
+            }
+        }
         .background(
             GeometryReader { geometry in
                 Color.clear
                     .onAppear {
                         updateToolbarStrip(geometry.safeAreaInsets.top)
                     }
-                    .onChange(of: geometry.safeAreaInsets.top) { height in
+                    .onChange(of: geometry.safeAreaInsets.top) { _, height in
                         updateToolbarStrip(height)
                     }
             }
@@ -48,7 +62,6 @@ public struct ContentView: View {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
             }
-            dropSidebarToggleFocus()
         }
         .fileImporter(
             isPresented: $isChoosingFolder,
@@ -103,28 +116,10 @@ public struct ContentView: View {
         isChoosingFolder = true
     }
 
-    /// The toolbar sidebar toggle keeps keyboard focus — and with it a
-    /// permanent focus ring — once clicked (or once the window appears),
-    /// because nothing in the detail pane is focusable to take over. Hand
-    /// focus back to the window whenever the toggle is used.
-    private func dropSidebarToggleFocus() {
-        DispatchQueue.main.async {
-            let window = NSApp.keyWindow ?? NSApp.windows.first(where: \.isVisible)
-            window?.makeFirstResponder(nil)
+    private func toggleSidebar() {
+        withAnimation {
+            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
         }
-    }
-
-    /// Routes NavigationSplitView's column writes through a custom binding so
-    /// the focus drop above runs on every sidebar toggle, including the
-    /// ⌥⌘S shortcut.
-    private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
-        Binding(
-            get: { columnVisibility },
-            set: {
-                columnVisibility = $0
-                dropSidebarToggleFocus()
-            }
-        )
     }
 }
 

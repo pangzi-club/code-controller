@@ -5,7 +5,7 @@ let package = Package(
     name: "DemoExplorer",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
         // The library carries all app code so the test target can import it;

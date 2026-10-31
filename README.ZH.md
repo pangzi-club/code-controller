@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.ZH.md)
 
-一个基于 SwiftUI 和 SwiftPM 的 macOS 桌面应用模板，以一个简单的文件浏览器作为示例 —— 无需 Xcode 工程文件。包内拆分为 library（全部应用代码）和只含 `@main` 的薄 executable，因此 Xcode Preview 开箱即用。
+一个基于 SwiftUI 和 SwiftPM 的 macOS 14+ 桌面应用模板，以一个简单的文件浏览器作为示例 —— 无需 Xcode 工程文件。包内拆分为 library（全部应用代码）和只含 `@main` 的薄 executable，因此 Xcode Preview 开箱即用。
 
 ## 功能
 

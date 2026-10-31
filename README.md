@@ -2,10 +2,10 @@
 
 [English](README.md) | [中文](README.ZH.md)
 
-A SwiftUI + SwiftPM template for macOS desktop apps, demonstrated by a simple
-file browser — no Xcode project needed. The package splits into a library
-(all app code) and a thin `@main` executable, so Xcode Previews work out of
-the box.
+A SwiftUI + SwiftPM template for macOS 14+ desktop apps, demonstrated by a
+simple file browser — no Xcode project needed. The package splits into a
+library (all app code) and a thin `@main` executable, so Xcode Previews work
+out of the box.
 
 ## Features
 

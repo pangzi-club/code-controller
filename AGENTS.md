@@ -5,7 +5,7 @@ Guidance for AI coding agents working in this repository.
 ## What this is
 
 A SwiftUI macOS desktop app template built with SwiftPM only — there is no
-`.xcodeproj`. Targets macOS 13+ with Swift tools 5.9. The demo app is a small
+`.xcodeproj`. Targets macOS 14+ with Swift tools 5.9. The demo app is a small
 file browser; replace its domain code when forking the template.
 
 The package has two targets: a **library** (`DemoExplorer`, all the views,
@@ -88,15 +88,13 @@ instead of a developer's home path.
   standard SwiftUI `Settings` scene (singleton, fixed to its content size,
   centered, opened from the App menu with ⌘,). The App menu is the single
   entry point; do not add an in-window settings button. The scene opens only
-  on demand and is not restored at launch. On macOS 13 there is no public
-  programmatic open action — a fork that needs a button should raise the
-  deployment target to macOS 14 for `openSettings` or keep the menu-only
-  entry. The standard menu item and window title follow the system language,
-  not the in-app language override.
+  on demand and is not restored at launch. `openSettings` is available on
+  macOS 14 if a fork adds a programmatic opener. The standard menu item and
+  window title follow the system language, not the in-app language override.
 - **Access control**: the library target (`Sources/DemoExplorer/`) must mark
   types and members `public` when the executable target
-  (`Sources/DemoExplorerApp/`) uses them. Protocol requirements (`body`,
-  `makeNSView`, `updateNSView`, …) on public types must also be `public`.
+  (`Sources/DemoExplorerApp/`) uses them. Protocol requirements (`body`, …) on
+  public types must also be `public`.
 
 ## Sandbox and distribution
 
@@ -150,17 +148,16 @@ instead of a developer's home path.
   system. Do not replace this with `Bundle.localizedString` or
   `String(localized:)`. The UI language is fixed at launch (strings are baked
   into views when they are built), so the language setting applies on relaunch.
-- The **NavigationSplitView sidebar toggle keeps its focus ring** once it has
-  keyboard focus — clicked or from launch — and nothing in the detail pane is
-  focusable to take over, so the ring never clears by itself. ContentView
-  routes the split view's `columnVisibility` through a custom binding that
-  calls `makeFirstResponder(nil)` on every toggle, and once on appear.
+- The **NavigationSplitView sidebar toggle** is replaced: hide the system
+  control with `.toolbar(removing: .sidebarToggle)` and provide a custom
+  toolbar button with `.focusEffectDisabled()`. The system toggle keeps a
+  focus ring that SwiftUI cannot clear; the custom button must not introduce
+  a new one. Apply the removal to the sidebar column's content — placing it
+  on the split view or the detail column leaves the system toggle visible.
 - SwiftUI window restoration keys the saved frame by the scene's content
-  type. A `private` top-level view (such as `TitlebarFlattener`) mangles to a
-  name containing a runtime address, so the autosave key changes every launch
-  and the frame is never restored. Keep `TitlebarFlattener` at internal
-  visibility and guard its name; make any new scene-content wrapper internal
-  too, or keep it off the window's content chain.
+  type. Keep every top-level scene wrapper non-private: a private type
+  mangles to a name containing a runtime address, so the autosave key changes
+  every launch and the frame is never restored.
 - Test frame restoration on the assembled `.app` (`make launch` / `make app`).
   An unbundled `swift run` binary has no bundle identity for system
   restoration, so it does not provide a meaningful frame-persistence check.
@@ -212,19 +209,21 @@ hand instead of overwriting the whole file.
 
 ## Layout: sidebar under the titlebar
 
-The main window uses `fullSizeContentView` with a transparent titlebar, so the
-sidebar's native translucent material reaches the traffic lights. Keep these
-coordinated:
+The main window uses `.windowStyle(.hiddenTitleBar)`, so content extends under
+the titlebar and the sidebar's native translucent material reaches the traffic
+lights. Keep these coordinated:
 
-- `TitlebarFlattener` sets `fullSizeContentView` and
-  `titlebarAppearsTransparent` on the window. Do not add an opaque toolbar
-  background on top of it.
+- `hiddenTitleBar` also suppresses the native window title. `FileListView`
+  supplies the folder name as an explicit `ToolbarItem(placement: .navigation)`
+  and keeps `.navigationTitle(folder.name)` for the Window menu and
+  Accessibility.
 - `SidebarView` ignores the top safe area and reserves the traffic-light strip
   in its header padding. `NavigationSplitView` would otherwise add its own top
   inset on top of the titlebar safe area, doubling the spacing.
-- `ContentView` hides the window toolbar background and overlays the page color
-  on the detail column at the root's top safe-area inset, so scrolled content
-  does not show through the toolbar controls.
+- `ContentView` hides the window toolbar background, removes the system
+  sidebar toggle, and overlays the page color on the detail column at the
+  root's top safe-area inset, so scrolled content does not show through the
+  toolbar controls.
 - Never paint an opaque background over the sidebar — the translucent material
   is the design. Panels that start below the toolbar must not ignore the top
   safe area.
