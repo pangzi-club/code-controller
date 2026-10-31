@@ -45,6 +45,8 @@ public struct ContentView: View {
                 .labelStyle(.iconOnly)
                 .help(l10n("Toggle Sidebar"))
                 .focusEffectDisabled()
+                // Toolbar adds 5pt; this puts the visible glyph on the list card's 20pt inset.
+                .padding(.leading, 8)
             }
         }
         .background(

@@ -224,6 +224,12 @@ lights. Keep these coordinated:
   sidebar toggle, and overlays the page color on the detail column at the
   root's top safe-area inset, so scrolled content does not show through the
   toolbar controls.
+- `hiddenTitleBar` leaves the toolbar without a trailing flexible region:
+  keep a `ToolbarItem { Spacer() }` before the `.primaryAction` group, or the
+  actions pack next to the title instead of the right edge.
+- The toolbar adds 5pt leading / 8pt trailing margins. Extra 8pt leading and
+  7pt trailing padding put the visible glyph edges on the list card's 20pt
+  content inset; re-measure if the toolbar style changes.
 - Never paint an opaque background over the sidebar — the translucent material
   is the design. Panels that start below the toolbar must not ignore the top
   safe area.

@@ -34,7 +34,12 @@ struct FileListView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
             }
-            ToolbarItemGroup {
+            // hiddenTitleBar leaves no trailing flexible region; without this
+            // the primary actions pack next to the title.
+            ToolbarItem {
+                Spacer()
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     FileOpener.reveal(folder.url)
                 } label: {
@@ -42,6 +47,7 @@ struct FileListView: View {
                         l10n("Show in Finder")
                     } icon: {
                         Image(systemName: "arrow.up.forward.app")
+                            .frame(width: 16, height: 16)
                     }
                 }
                 Button {
@@ -51,8 +57,11 @@ struct FileListView: View {
                         l10n("Refresh")
                     } icon: {
                         Image(systemName: "arrow.clockwise")
+                            .frame(width: 16, height: 16)
                     }
                 }
+                // Toolbar adds 8pt; match the visible glyph to the card's 20pt inset.
+                .padding(.trailing, 7)
             }
         }
         .onAppear(perform: reload)
