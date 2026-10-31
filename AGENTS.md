@@ -225,8 +225,10 @@ lights. Keep these coordinated:
 - `ContentView` hides the window toolbar background, removes the system sidebar
   toggle, and overlays the page color on the detail column at the root's top
   safe-area inset, so scrolled content does not show through the toolbar
-  controls. Full screen hides the native toolbar (AppKit forces a glass band
-  there) without adding a replacement toolbar inside the content.
+  controls. Full screen hides the native toolbar on `willEnterFullScreen` and
+  keeps it hidden until `didExitFullScreen` to avoid a glass-band flash during
+  the transition; `styleMask` observation resynchronizes the state. Do not add a
+  replacement toolbar inside the content.
 - `hiddenTitleBar` leaves the toolbar without a trailing flexible region:
   keep a `ToolbarItem { Spacer() }` before the `.primaryAction` group, or the
   actions pack next to the title instead of the right edge.

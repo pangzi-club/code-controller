@@ -165,13 +165,15 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
         private weak var window: NSWindow?
         private var styleMaskObservation: NSKeyValueObservation?
+        private var observations: [NSObjectProtocol] = []
+        private var isExitingFullScreen = false
 
         init(isFullScreen: Binding<Bool>) {
             self.isFullScreen = isFullScreen
         }
 
         deinit {
-            styleMaskObservation = nil
+            removeObservations()
         }
 
         func attach(to window: NSWindow?) {
@@ -181,7 +183,8 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 }
                 return
             }
-            styleMaskObservation = nil
+            removeObservations()
+            isExitingFullScreen = false
             self.window = window
 
             guard let window else { return }
@@ -200,10 +203,37 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                     }
                 }
             }
+
+            let center = NotificationCenter.default
+            observations.append(center.addObserver(
+                forName: NSWindow.willEnterFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                self?.isExitingFullScreen = false
+                self?.publish(true)
+            })
+            observations.append(center.addObserver(
+                forName: NSWindow.willExitFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                self?.isExitingFullScreen = true
+            })
+            observations.append(center.addObserver(
+                forName: NSWindow.didExitFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                self?.isExitingFullScreen = false
+                self?.publish(false)
+            })
         }
 
         private func sync(to window: NSWindow) {
-            publish(window.styleMask.contains(.fullScreen))
+            let isActuallyFullScreen = window.styleMask.contains(.fullScreen)
+            guard isActuallyFullScreen || !isExitingFullScreen else { return }
+            publish(isActuallyFullScreen)
         }
 
         private func publish(_ value: Bool) {
@@ -212,6 +242,13 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 guard let self, self.isFullScreen.wrappedValue != value else { return }
                 self.isFullScreen.wrappedValue = value
             }
+        }
+
+        private func removeObservations() {
+            styleMaskObservation = nil
+            let center = NotificationCenter.default
+            observations.forEach(center.removeObserver)
+            observations.removeAll()
         }
     }
 
