@@ -12,6 +12,7 @@ public struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var toolbarStripHeight: CGFloat = 52
     @State private var isFullScreen = false
+    @State private var isExitingFullScreen = false
     @State private var isChoosingFolder = false
 
     public init() {}
@@ -23,6 +24,9 @@ public struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             detailContent
+                // AppKit restores the titlebar safe area before didExit. Keep
+                // the inline toolbar pinned until the native toolbar replaces it.
+                .ignoresSafeArea(.container, edges: isExitingFullScreen ? .top : [])
                 .overlay(alignment: .top) {
                     if !isFullScreen {
                         pageColor
@@ -64,7 +68,10 @@ public struct ContentView: View {
                     }
             }
         )
-        .background(WindowFullScreenReader(isFullScreen: $isFullScreen))
+        .background(WindowFullScreenReader(
+            isFullScreen: $isFullScreen,
+            isExitingFullScreen: $isExitingFullScreen
+        ))
         .onAppear {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
@@ -143,9 +150,13 @@ public struct ContentView: View {
 
 private struct WindowFullScreenReader: NSViewRepresentable {
     @Binding var isFullScreen: Bool
+    @Binding var isExitingFullScreen: Bool
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(isFullScreen: $isFullScreen)
+        Coordinator(
+            isFullScreen: $isFullScreen,
+            isExitingFullScreen: $isExitingFullScreen
+        )
     }
 
     func makeNSView(context: Context) -> WindowTrackingView {
@@ -158,6 +169,7 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
     func updateNSView(_ view: WindowTrackingView, context: Context) {
         context.coordinator.isFullScreen = $isFullScreen
+        context.coordinator.isExitingFullScreen = $isExitingFullScreen
         context.coordinator.attach(to: view.window)
     }
 
@@ -168,14 +180,18 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
     final class Coordinator {
         var isFullScreen: Binding<Bool>
+        var isExitingFullScreen: Binding<Bool>
 
         private weak var window: NSWindow?
         private var observations: [NSObjectProtocol] = []
         private var styleMaskObservation: NSKeyValueObservation?
-        private var isExitingFullScreen = false
 
-        init(isFullScreen: Binding<Bool>) {
+        init(
+            isFullScreen: Binding<Bool>,
+            isExitingFullScreen: Binding<Bool>
+        ) {
             self.isFullScreen = isFullScreen
+            self.isExitingFullScreen = isExitingFullScreen
         }
 
         deinit {
@@ -185,7 +201,7 @@ private struct WindowFullScreenReader: NSViewRepresentable {
         func attach(to window: NSWindow?) {
             if self.window === window {
                 if let window {
-                    publish(window.styleMask.contains(.fullScreen))
+                    sync(to: window)
                 }
                 return
             }
@@ -216,7 +232,7 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 queue: .main
             ) { [weak self, weak window] _ in
                 if let window {
-                    self?.isExitingFullScreen = false
+                    self?.publishExiting(false)
                     self?.sync(to: window)
                 }
             })
@@ -226,7 +242,7 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 queue: .main
             ) { [weak self, weak window] _ in
                 if window != nil {
-                    self?.isExitingFullScreen = false
+                    self?.publishExiting(false)
                     self?.publish(true)
                 }
             })
@@ -236,7 +252,7 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 queue: .main
             ) { [weak self, weak window] _ in
                 if window != nil {
-                    self?.isExitingFullScreen = true
+                    self?.publishExiting(true)
                 }
             })
             observations.append(center.addObserver(
@@ -245,7 +261,7 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 queue: .main
             ) { [weak self, weak window] _ in
                 if window != nil {
-                    self?.isExitingFullScreen = false
+                    self?.publishExiting(false)
                     self?.publish(false)
                 }
             })
@@ -253,8 +269,13 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
         private func sync(to window: NSWindow) {
             let isActuallyFullScreen = window.styleMask.contains(.fullScreen)
-            guard isActuallyFullScreen || !isExitingFullScreen else { return }
+            guard isActuallyFullScreen || !isExitingFullScreen.wrappedValue else { return }
             publish(isActuallyFullScreen)
+        }
+
+        private func publishExiting(_ value: Bool) {
+            guard isExitingFullScreen.wrappedValue != value else { return }
+            isExitingFullScreen.wrappedValue = value
         }
 
         private func publish(_ value: Bool) {
@@ -267,7 +288,6 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
         private func removeObservations() {
             styleMaskObservation = nil
-            isExitingFullScreen = false
             let center = NotificationCenter.default
             observations.forEach(center.removeObserver)
             observations.removeAll()
