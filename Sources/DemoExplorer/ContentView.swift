@@ -13,7 +13,6 @@ public struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var toolbarStripHeight: CGFloat = 52
     @State private var isChoosingFolder = false
-    @Environment(\.openWindow) private var openWindow
 
     public init() {}
 
@@ -63,9 +62,6 @@ public struct ContentView: View {
             case .failure(let error):
                 Log.files.error("Folder picker failed: \(error.localizedDescription)")
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .openSettingsWindow)) { _ in
-            openWindow(id: "settings")
         }
     }
 

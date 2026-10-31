@@ -24,31 +24,15 @@ struct DemoExplorerApp: App {
                 .background(TitlebarFlattener())
         }
         .windowToolbarStyle(.unified(showsTitle: true))
-        .commands {
-            // Without a Settings scene there is no default Settings… menu
-            // item; put it back with its standard shortcut. Commands can't
-            // reach the openWindow environment action, so the item posts a
-            // notification that ContentView forwards.
-            CommandGroup(replacing: .appSettings) {
-                Button(l10nString("Settings") + "…") {
-                    NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
-                }
-                .keyboardShortcut(",", modifiers: .command)
-            }
-        }
 
-        // The settings window: a single instance (re-opening focuses it),
-        // fixed to its content size and centered. Deliberately a plain
-        // Window scene rather than a Settings scene: opening a Settings
-        // scene programmatically is macOS 14+ API, and its undocumented
-        // showSettingsWindow: selector proved unreliable.
-        Window(l10nString("Settings"), id: "settings") {
+        // A standard Settings scene: singleton, fixed to its content size,
+        // centered, and opened from the app menu (⌘,). It is not restored at
+        // launch and needs no programmatic opener.
+        Settings {
             SettingsView()
                 .environmentObject(settings)
                 .preferredColorScheme(settings.theme.colorScheme)
         }
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
     }
 }
 
