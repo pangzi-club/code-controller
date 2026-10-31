@@ -12,21 +12,22 @@ public struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var toolbarStripHeight: CGFloat = 52
     @State private var isFullScreen = false
-    @State private var isExitingFullScreen = false
     @State private var isChoosingFolder = false
 
     public init() {}
 
     public var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(store: store, selection: $selection, onAddFolder: presentFolderPicker)
+            SidebarView(
+                store: store,
+                selection: $selection,
+                topPadding: isFullScreen ? 8 : toolbarStripHeight + 8,
+                onAddFolder: presentFolderPicker
+            )
                 .toolbar(removing: .sidebarToggle)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             detailContent
-                // AppKit restores the titlebar safe area before didExit. Keep
-                // the inline toolbar pinned until the native toolbar replaces it.
-                .ignoresSafeArea(.container, edges: isExitingFullScreen ? .top : [])
                 .overlay(alignment: .top) {
                     if !isFullScreen {
                         pageColor
@@ -68,10 +69,7 @@ public struct ContentView: View {
                     }
             }
         )
-        .background(WindowFullScreenReader(
-            isFullScreen: $isFullScreen,
-            isExitingFullScreen: $isExitingFullScreen
-        ))
+        .background(WindowFullScreenReader(isFullScreen: $isFullScreen))
         .onAppear {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
@@ -110,11 +108,7 @@ public struct ContentView: View {
         switch selection {
         case .folder(let id):
             if let folder = store.folders.first(where: { $0.id == id }) {
-                FileListView(
-                    folder: folder,
-                    showsFullScreenToolbar: isFullScreen,
-                    toggleSidebar: toggleSidebar
-                )
+                FileListView(folder: folder)
                     .id(folder.id)
             } else {
                 placeholder
@@ -125,15 +119,8 @@ public struct ContentView: View {
     }
 
     private var placeholder: some View {
-        VStack(spacing: 0) {
-            if isFullScreen {
-                InlineWindowToolbar(title: nil, toggleSidebar: toggleSidebar) {
-                    EmptyView()
-                }
-            }
-            PlaceholderView(hasFolders: !store.folders.isEmpty) {
-                presentFolderPicker()
-            }
+        PlaceholderView(hasFolders: !store.folders.isEmpty) {
+            presentFolderPicker()
         }
     }
 
@@ -150,13 +137,9 @@ public struct ContentView: View {
 
 private struct WindowFullScreenReader: NSViewRepresentable {
     @Binding var isFullScreen: Bool
-    @Binding var isExitingFullScreen: Bool
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(
-            isFullScreen: $isFullScreen,
-            isExitingFullScreen: $isExitingFullScreen
-        )
+        Coordinator(isFullScreen: $isFullScreen)
     }
 
     func makeNSView(context: Context) -> WindowTrackingView {
@@ -169,7 +152,6 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
     func updateNSView(_ view: WindowTrackingView, context: Context) {
         context.coordinator.isFullScreen = $isFullScreen
-        context.coordinator.isExitingFullScreen = $isExitingFullScreen
         context.coordinator.attach(to: view.window)
     }
 
@@ -180,22 +162,16 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
     final class Coordinator {
         var isFullScreen: Binding<Bool>
-        var isExitingFullScreen: Binding<Bool>
 
         private weak var window: NSWindow?
-        private var observations: [NSObjectProtocol] = []
         private var styleMaskObservation: NSKeyValueObservation?
 
-        init(
-            isFullScreen: Binding<Bool>,
-            isExitingFullScreen: Binding<Bool>
-        ) {
+        init(isFullScreen: Binding<Bool>) {
             self.isFullScreen = isFullScreen
-            self.isExitingFullScreen = isExitingFullScreen
         }
 
         deinit {
-            removeObservations()
+            styleMaskObservation = nil
         }
 
         func attach(to window: NSWindow?) {
@@ -205,7 +181,7 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 }
                 return
             }
-            removeObservations()
+            styleMaskObservation = nil
             self.window = window
 
             guard let window else { return }
@@ -224,58 +200,10 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                     }
                 }
             }
-
-            let center = NotificationCenter.default
-            observations.append(center.addObserver(
-                forName: NSWindow.willEnterFullScreenNotification,
-                object: window,
-                queue: .main
-            ) { [weak self, weak window] _ in
-                if let window {
-                    self?.publishExiting(false)
-                    self?.sync(to: window)
-                }
-            })
-            observations.append(center.addObserver(
-                forName: NSWindow.didEnterFullScreenNotification,
-                object: window,
-                queue: .main
-            ) { [weak self, weak window] _ in
-                if window != nil {
-                    self?.publishExiting(false)
-                    self?.publish(true)
-                }
-            })
-            observations.append(center.addObserver(
-                forName: NSWindow.willExitFullScreenNotification,
-                object: window,
-                queue: .main
-            ) { [weak self, weak window] _ in
-                if window != nil {
-                    self?.publishExiting(true)
-                }
-            })
-            observations.append(center.addObserver(
-                forName: NSWindow.didExitFullScreenNotification,
-                object: window,
-                queue: .main
-            ) { [weak self, weak window] _ in
-                if window != nil {
-                    self?.publishExiting(false)
-                    self?.publish(false)
-                }
-            })
         }
 
         private func sync(to window: NSWindow) {
-            let isActuallyFullScreen = window.styleMask.contains(.fullScreen)
-            guard isActuallyFullScreen || !isExitingFullScreen.wrappedValue else { return }
-            publish(isActuallyFullScreen)
-        }
-
-        private func publishExiting(_ value: Bool) {
-            guard isExitingFullScreen.wrappedValue != value else { return }
-            isExitingFullScreen.wrappedValue = value
+            publish(window.styleMask.contains(.fullScreen))
         }
 
         private func publish(_ value: Bool) {
@@ -284,13 +212,6 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 guard let self, self.isFullScreen.wrappedValue != value else { return }
                 self.isFullScreen.wrappedValue = value
             }
-        }
-
-        private func removeObservations() {
-            styleMaskObservation = nil
-            let center = NotificationCenter.default
-            observations.forEach(center.removeObserver)
-            observations.removeAll()
         }
     }
 
@@ -340,6 +261,7 @@ private struct PlaceholderView: View {
 private struct SidebarView: View {
     @ObservedObject var store: FolderStore
     @Binding var selection: SidebarSelection?
+    let topPadding: CGFloat
     let onAddFolder: () -> Void
 
     @State private var hoveredFolderID: UUID?
@@ -367,8 +289,9 @@ private struct SidebarView: View {
                         .background(Capsule().fill(Color.primary.opacity(0.06)))
                 }
             }
+            .frame(height: 20)
             .padding(.horizontal, 16)
-            .padding(.top, 44)
+            .padding(.top, topPadding)
             .padding(.bottom, 8)
 
             if store.folders.isEmpty {

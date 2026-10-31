@@ -218,22 +218,21 @@ lights. Keep these coordinated:
   and keeps `.navigationTitle(folder.name)` for the Window menu and
   Accessibility.
 - `SidebarView` ignores the top safe area and reserves the traffic-light strip
-  in its header padding. `NavigationSplitView` would otherwise add its own top
-  inset on top of the titlebar safe area, doubling the spacing.
+  with `toolbarStripHeight + 8` header padding in windowed mode. Full screen
+  uses 8pt; both headers have a 20pt row height so the sidebar and detail labels
+  align. `NavigationSplitView` would otherwise add its own top inset on top of
+  the titlebar safe area, doubling the spacing.
 - `ContentView` hides the window toolbar background, removes the system sidebar
   toggle, and overlays the page color on the detail column at the root's top
   safe-area inset, so scrolled content does not show through the toolbar
   controls. Full screen hides the native toolbar (AppKit forces a glass band
-  there) and uses `InlineWindowToolbar` inside the content instead.
+  there) without adding a replacement toolbar inside the content.
 - `hiddenTitleBar` leaves the toolbar without a trailing flexible region:
   keep a `ToolbarItem { Spacer() }` before the `.primaryAction` group, or the
   actions pack next to the title instead of the right edge.
 - The toolbar adds 5pt leading / 8pt trailing margins. Extra 8pt leading and
   7pt trailing padding put the visible glyph edges on the list card's 20pt
   content inset; re-measure if the toolbar style changes.
-- `InlineWindowToolbar` uses 14pt horizontal padding around its 28pt buttons;
-  their centered 16pt glyphs then land on the same 20pt content inset. Keep
-  the button, glyph and outer-padding measurements coordinated.
 - Never paint an opaque background over the sidebar — the translucent material
   is the design. Panels that start below the toolbar must not ignore the top
   safe area.
