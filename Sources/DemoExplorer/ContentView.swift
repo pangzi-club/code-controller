@@ -24,11 +24,13 @@ public struct ContentView: View {
         } detail: {
             detailContent
                 .overlay(alignment: .top) {
-                    pageColor
-                        .frame(height: toolbarStripHeight)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .ignoresSafeArea(.container, edges: .top)
-                        .allowsHitTesting(false)
+                    if !isFullScreen {
+                        pageColor
+                            .frame(height: toolbarStripHeight)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            .ignoresSafeArea(.container, edges: .top)
+                            .allowsHitTesting(false)
+                    }
                 }
         }
         .navigationSplitViewStyle(.balanced)
@@ -90,9 +92,10 @@ public struct ContentView: View {
     /// Keeps the page-colored strip above the detail column in sync with the
     /// transparent toolbar.
     private func updateToolbarStrip(_ height: CGFloat) {
-        let clamped = max(0, height)
-        guard abs(clamped - toolbarStripHeight) > 0.5 else { return }
-        toolbarStripHeight = clamped
+        // Retain the last windowed height while full screen removes the safe
+        // area, so the strip is ready in the same frame as the toolbar returns.
+        guard height > 0.5, abs(height - toolbarStripHeight) > 0.5 else { return }
+        toolbarStripHeight = height
     }
 
     @ViewBuilder
@@ -168,6 +171,8 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
         private weak var window: NSWindow?
         private var observations: [NSObjectProtocol] = []
+        private var styleMaskObservation: NSKeyValueObservation?
+        private var isExitingFullScreen = false
 
         init(isFullScreen: Binding<Bool>) {
             self.isFullScreen = isFullScreen
@@ -189,10 +194,18 @@ private struct WindowFullScreenReader: NSViewRepresentable {
 
             guard let window else { return }
 
-            publish(window.styleMask.contains(.fullScreen))
+            sync(to: window)
             DispatchQueue.main.async { [weak self, weak window] in
                 if let window {
-                    self?.publish(window.styleMask.contains(.fullScreen))
+                    self?.sync(to: window)
+                }
+            }
+
+            styleMaskObservation = window.observe(\.styleMask, options: [.new]) { [weak self, weak window] _, _ in
+                DispatchQueue.main.async {
+                    if let window {
+                        self?.sync(to: window)
+                    }
                 }
             }
 
@@ -202,22 +215,46 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 object: window,
                 queue: .main
             ) { [weak self, weak window] _ in
-                if window != nil { self?.publish(true) }
+                if let window {
+                    self?.isExitingFullScreen = false
+                    self?.sync(to: window)
+                }
             })
             observations.append(center.addObserver(
                 forName: NSWindow.didEnterFullScreenNotification,
                 object: window,
                 queue: .main
             ) { [weak self, weak window] _ in
-                if window != nil { self?.publish(true) }
+                if window != nil {
+                    self?.isExitingFullScreen = false
+                    self?.publish(true)
+                }
+            })
+            observations.append(center.addObserver(
+                forName: NSWindow.willExitFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self, weak window] _ in
+                if window != nil {
+                    self?.isExitingFullScreen = true
+                }
             })
             observations.append(center.addObserver(
                 forName: NSWindow.didExitFullScreenNotification,
                 object: window,
                 queue: .main
             ) { [weak self, weak window] _ in
-                if window != nil { self?.publish(false) }
+                if window != nil {
+                    self?.isExitingFullScreen = false
+                    self?.publish(false)
+                }
             })
+        }
+
+        private func sync(to window: NSWindow) {
+            let isActuallyFullScreen = window.styleMask.contains(.fullScreen)
+            guard isActuallyFullScreen || !isExitingFullScreen else { return }
+            publish(isActuallyFullScreen)
         }
 
         private func publish(_ value: Bool) {
@@ -229,6 +266,8 @@ private struct WindowFullScreenReader: NSViewRepresentable {
         }
 
         private func removeObservations() {
+            styleMaskObservation = nil
+            isExitingFullScreen = false
             let center = NotificationCenter.default
             observations.forEach(center.removeObserver)
             observations.removeAll()
