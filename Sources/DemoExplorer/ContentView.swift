@@ -37,6 +37,10 @@ public struct ContentView: View {
                             .allowsHitTesting(false)
                     }
                 }
+                // Before macOS 26 hiding the window toolbar only empties it, the
+                // top safe area stays at the toolbar height, so the detail column
+                // has to ignore it to match the sidebar's full-screen inset.
+                .ignoresSafeArea(.container, edges: isFullScreen ? .top : [])
         }
         .navigationSplitViewStyle(.balanced)
         .background(pageColor)
