@@ -225,10 +225,13 @@ lights. Keep these coordinated:
 - `ContentView` hides the window toolbar background, removes the system sidebar
   toggle, and overlays the page color on the detail column at the root's top
   safe-area inset, so scrolled content does not show through the toolbar
-  controls. Full screen hides the native toolbar on `willEnterFullScreen` and
-  keeps it hidden until `didExitFullScreen` to avoid a glass-band flash during
-  the transition; `styleMask` observation resynchronizes the state. Do not add a
-  replacement toolbar inside the content.
+  controls. `WindowChrome` hides the toolbar in full screen by setting
+  `NSToolbar.isVisible`, and re-asserts it on `styleMask` observation, view
+  updates and `didEnterFullScreen` because AppKit restores it mid-transition.
+  Do not swap that for `.toolbar(.hidden, for: .windowToolbar)`: the modifier
+  only empties the titlebar, so the detail column keeps the toolbar-height top
+  safe area and, before macOS 26, full screen loses the traffic lights from the
+  auto-hide overlay. Do not add a replacement toolbar inside the content.
 - `hiddenTitleBar` leaves the toolbar without a trailing flexible region:
   keep a `ToolbarItem { Spacer() }` before the `.primaryAction` group, or the
   actions pack next to the title instead of the right edge.
