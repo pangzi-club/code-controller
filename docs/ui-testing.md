@@ -168,6 +168,11 @@ first visible frame should already be the saved size.
 6. Enter full screen: neither the native toolbar nor an inline replacement may
    appear, and there must be no glass band or clipped sidebar header. Exit full
    screen and confirm that the native toolbar and titlebar treatment return.
+7. Close every window (⌘W; confirm with `axfind "AXWindow"`), then click the
+   Dock icon: the main window must come back. Minimize it (⌘M) and click the
+   Dock icon instead — the same window must deminiaturize, never a second one.
+   The reopen path lives in `AppDelegate.applicationShouldHandleReopen`; a
+   stock SwiftUI `WindowGroup` opens nothing on its own.
 
 ## Appearance and localization
 
@@ -276,8 +281,9 @@ its domain and container under `~/Library/Containers/<bundleID>/Data`;
 | `theme` | `system`, `light` or `dark` |
 | `language` | `en`, `zh-Hans`, or absent for Follow System |
 
-Window frames are not an app key: SwiftUI stores them under
-`NSWindow Frame SwiftUI.WindowGroup<…>`.
+Window frames are not an app key: SwiftUI stores them under the scene's frame
+autosave name, `NSWindow Frame main-AppWindow-1` for the main
+`WindowGroup(id: "main")`.
 
 ```sh
 defaults delete "$APP_BUNDLE_ID"            # clean slate

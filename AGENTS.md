@@ -155,9 +155,19 @@ instead of a developer's home path.
   a new one. Apply the removal to the sidebar column's content — placing it
   on the split view or the detail column leaves the system toggle visible.
 - SwiftUI window restoration keys the saved frame by the scene's content
-  type. Keep every top-level scene wrapper non-private: a private type
-  mangles to a name containing a runtime address, so the autosave key changes
-  every launch and the frame is never restored.
+  type, or by its explicit id when one is given: the main
+  `WindowGroup(id: "main")` saves as
+  `NSWindow Frame main-AppWindow-1`. Keep every top-level scene wrapper
+  non-private: a private type mangles to a name containing a runtime address,
+  so the autosave key changes every launch and the frame is never restored.
+  Changing the scene id also abandons the saved frame once.
+- SwiftUI does **not** recreate the window of a closed `WindowGroup` when the
+  Dock icon is clicked: the reopen arrives as
+  `applicationShouldHandleReopen` and the app activates with no UI. The
+  `AppDelegate` adaptor in `DemoExplorerApp.swift` opens one instead; the
+  root view hands it the environment's `openWindow` action from `.onAppear`,
+  because that action is the only API that can open a `WindowGroup` window and
+  is reachable only from inside a scene.
 - Test frame restoration on the assembled `.app` (`make launch` / `make app`).
   An unbundled `swift run` binary has no bundle identity for system
   restoration, so it does not provide a meaningful frame-persistence check.
