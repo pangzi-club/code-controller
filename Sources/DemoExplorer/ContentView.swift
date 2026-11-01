@@ -37,15 +37,10 @@ public struct ContentView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                // Before macOS 26 hiding the window toolbar only empties it, the
-                // top safe area stays at the toolbar height, so the detail column
-                // has to ignore it to match the sidebar's full-screen inset.
-                .ignoresSafeArea(.container, edges: isFullScreen ? .top : [])
         }
         .navigationSplitViewStyle(.balanced)
         .background(pageColor)
         .toolbarBackground(.hidden, for: .windowToolbar)
-        .toolbar(isFullScreen ? .hidden : .visible, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: toggleSidebar) {
@@ -73,7 +68,7 @@ public struct ContentView: View {
                     }
             }
         )
-        .background(WindowFullScreenReader(isFullScreen: $isFullScreen))
+        .background(WindowChrome(isFullScreen: $isFullScreen))
         .onAppear {
             if selection == nil {
                 selection = store.folders.first.map { .folder($0.id) }
@@ -139,7 +134,13 @@ public struct ContentView: View {
     }
 }
 
-private struct WindowFullScreenReader: NSViewRepresentable {
+/// Tracks full screen and keeps the window toolbar hidden while in it.
+///
+/// `.toolbar(.hidden, for: .windowToolbar)` only empties the titlebar: the top
+/// safe area keeps the toolbar height and, before macOS 26, the full-screen
+/// auto-hide overlay loses its traffic lights. `NSToolbar.isVisible` collapses
+/// the safe area and leaves the buttons alone.
+private struct WindowChrome: NSViewRepresentable {
     @Binding var isFullScreen: Bool
 
     func makeCoordinator() -> Coordinator {
@@ -218,6 +219,14 @@ private struct WindowFullScreenReader: NSViewRepresentable {
                 self?.publish(true)
             })
             observations.append(center.addObserver(
+                forName: NSWindow.didEnterFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { [weak self, weak window] _ in
+                guard let self, let window else { return }
+                self.setToolbar(window, visible: false)
+            })
+            observations.append(center.addObserver(
                 forName: NSWindow.willExitFullScreenNotification,
                 object: window,
                 queue: .main
@@ -237,7 +246,15 @@ private struct WindowFullScreenReader: NSViewRepresentable {
         private func sync(to window: NSWindow) {
             let isActuallyFullScreen = window.styleMask.contains(.fullScreen)
             guard isActuallyFullScreen || !isExitingFullScreen else { return }
+            setToolbar(window, visible: !isActuallyFullScreen)
             publish(isActuallyFullScreen)
+        }
+
+        /// The toolbar can come back on its own during the transition, and it may
+        /// not exist yet on the first pass, so every sync re-asserts the state.
+        private func setToolbar(_ window: NSWindow, visible: Bool) {
+            guard let toolbar = window.toolbar, toolbar.isVisible != visible else { return }
+            toolbar.isVisible = visible
         }
 
         private func publish(_ value: Bool) {
