@@ -1,6 +1,6 @@
 # Template Maintenance
 
-Template version: 2026-10-30
+Template version: 2026-11-02
 
 This app started from **swiftui-starter**. The files below are owned by the
 template; app-specific code and configuration belong to this repository. When
@@ -46,6 +46,10 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
 
 ## Changelog
 
+- 2026-11-02 — packaging: `make app` emits one `.app` per architecture
+  (`build/<Display Name>-<arch>.app`), `ARCHS` selects a subset, and
+  `make launch` / `make install` build only the host architecture. The App
+  Store build stays a single universal bundle in the `.pkg`.
 - 2026-10-30 — distribution pipeline: build number, `DEV=1` / `MAS=1` modes,
   universal builds, hardened runtime, App Sandbox entitlements, privacy
   manifest, App Store `.pkg`; `Scripts/template-diff.sh` and this file.

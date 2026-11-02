@@ -5,8 +5,9 @@
 # truth shared with Scripts/make-app.sh.
 APPINFO := $(firstword $(wildcard Sources/*/AppInfo.swift))
 APP_DISPLAY_NAME := $(shell sed -nE 's/^[[:space:]]*static let displayName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' $(APPINFO))
-APP_PATH := build/$(APP_DISPLAY_NAME).app
-DEV_APP_PATH := build/$(APP_DISPLAY_NAME)-Dev.app
+HOST_ARCH := $(shell uname -m)
+APP_PATH := build/$(APP_DISPLAY_NAME)-$(HOST_ARCH).app
+DEV_APP_PATH := build/$(APP_DISPLAY_NAME)-Dev-$(HOST_ARCH).app
 
 .DEFAULT_GOAL := help
 
@@ -25,18 +26,19 @@ test: ## Run tests (Swift Testing + XCTest)
 check-l10n: ## Verify Localizable.strings key parity across languages
 	python3 Scripts/check-l10n.py
 
-app: ## Assemble the distribution .app bundle (Developer ID or ad-hoc)
+app: ## Assemble arm64 and x86_64 .app bundles (Developer ID or ad-hoc)
 	./Scripts/make-app.sh
 
-install: app ## Assemble the .app and install it into /Applications
+install: ## Assemble the host-arch .app and install it into /Applications
+	ARCHS="$(HOST_ARCH)" ./Scripts/make-app.sh
 	rm -rf "/Applications/$(APP_DISPLAY_NAME).app"
 	ditto "$(APP_PATH)" "/Applications/$(APP_DISPLAY_NAME).app"
 
-mas: ## Assemble the App Store build and .pkg (Apple Distribution)
+mas: ## Assemble the universal App Store build and .pkg (Apple Distribution)
 	MAS=1 ./Scripts/make-app.sh
 
-launch: ## Assemble and open the dev .app (dev identity, separate TCC/container)
-	DEV=1 ./Scripts/make-app.sh
+launch: ## Assemble and open the host-arch dev .app (separate TCC/container)
+	ARCHS="$(HOST_ARCH)" DEV=1 ./Scripts/make-app.sh
 	open "$(DEV_APP_PATH)"
 
 rename: ## Rename the app template: make rename NEW=MyApp ID=com.me.MyApp

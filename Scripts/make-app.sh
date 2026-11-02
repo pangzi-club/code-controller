@@ -1,20 +1,24 @@
 #!/bin/bash
-# Assembles a proper .app bundle from the SwiftPM build.
+# Assembles proper .app bundles from the SwiftPM build, one per architecture
+# (arm64 + x86_64 by default) so Apple Silicon and Intel Macs each get a native
+# bundle. The App Store build remains a single universal bundle inside the .pkg.
 # App identity (display name, bundle ID, version, build) is parsed from the
 # AppInfo.swift next to the sources; the target/binary name and minimum macOS
 # version are derived from Package.swift via `swift package describe`, so
 # nothing is duplicated here.
 #
-# The bundle is built universal (arm64 + x86_64). Local and Developer ID
-# builds sign with Scripts/App.entitlements (unsandboxed by default); the App
-# Store build signs with Scripts/App.sandbox.entitlements.
+# Local and Developer ID builds sign with Scripts/App.entitlements
+# (unsandboxed by default); the App Store build signs with
+# Scripts/App.sandbox.entitlements.
 #
 # Usage:
-#   ./Scripts/make-app.sh          # Developer ID (or ad-hoc) build, direct distribution
-#   DEV=1 ./Scripts/make-app.sh    # local dev build: .dev bundle ID + "-Dev" name
-#   MAS=1 ./Scripts/make-app.sh    # App Store build + .pkg, sandboxed, Apple Distribution
+#   ./Scripts/make-app.sh                  # Developer ID (or ad-hoc), arm64 + x86_64
+#   ARCHS="arm64" ./Scripts/make-app.sh    # build a subset of architectures
+#   DEV=1 ./Scripts/make-app.sh            # local dev build: .dev bundle ID + "-Dev" name
+#   MAS=1 ./Scripts/make-app.sh            # App Store build + .pkg, sandboxed, universal
 #
 # Environment overrides:
+#   ARCHS                architectures for direct/dev builds (default "arm64 x86_64")
 #   SIGN_IDENTITY        signing identity (defaults to Developer ID Application
 #                        for a normal build, Apple Distribution for MAS=1)
 #   INSTALLER_IDENTITY   installer certificate for the MAS .pkg
@@ -30,6 +34,24 @@ MAS="${MAS:-0}"
 DEV="${DEV:-0}"
 if [[ "$MAS" == "1" && "$DEV" == "1" ]]; then
     die "MAS=1 and DEV=1 are mutually exclusive"
+fi
+
+if [[ "$MAS" == "1" ]]; then
+    # App Store builds ship one universal bundle in the .pkg.
+    if [[ -n "${ARCHS:-}" ]]; then
+        echo "note: MAS=1 builds a universal app; ignoring ARCHS=$ARCHS"
+    fi
+    ARCH_LIST=(universal)
+else
+    ARCHS="${ARCHS:-arm64 x86_64}"
+    read -r -a ARCH_LIST <<<"$ARCHS" || true
+    [[ ${#ARCH_LIST[@]} -gt 0 ]] || die "ARCHS is empty"
+    for ARCH in "${ARCH_LIST[@]}"; do
+        case "$ARCH" in
+            arm64|x86_64) ;;
+            *) die "unsupported architecture '$ARCH' (expected arm64 or x86_64)" ;;
+        esac
+    done
 fi
 
 # --- Target/binary name and minimum OS: ask SwiftPM --------------------------
@@ -86,39 +108,15 @@ fi
 
 echo "==> Identity: $EFFECTIVE_DISPLAY_NAME $VERSION ($BUILD) ($EFFECTIVE_BUNDLE_ID), target: $TARGET_NAME"
 
-echo "==> Building (release, universal)…"
-# Multiple --arch flags make SwiftPM emit a universal binary; with them the
-# products land in .build/apple/Products/Release instead of .build/release.
-SWIFT_BUILD_ARGS=(-c release --arch arm64 --arch x86_64)
-swift build "${SWIFT_BUILD_ARGS[@]}"
-BIN_DIR="$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
-[[ -x "$BIN_DIR/$TARGET_NAME" ]] || die "built binary not found at $BIN_DIR/$TARGET_NAME"
-
 BUILD_DIR="$ROOT/build"
-APP_DIR="$BUILD_DIR/$EFFECTIVE_DISPLAY_NAME.app"
-CONTENTS="$APP_DIR/Contents"
-
-rm -rf "$APP_DIR"
-mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
-
-echo "==> Copying binary and resources… ($(lipo -archs "$BIN_DIR/$TARGET_NAME"))"
-cp "$BIN_DIR/$TARGET_NAME" "$CONTENTS/MacOS/$TARGET_NAME"
-# Bundle.module resolves this resource bundle from the library target's
-# Resources directory (the binary target name differs from the library's).
-RESOURCE_BUNDLE="$(ls -d "$BIN_DIR/${PACKAGE_NAME}_"*.bundle 2>/dev/null | head -1)"
-[[ -n "$RESOURCE_BUNDLE" ]] || die "resource bundle not found in $BIN_DIR"
-cp -R "$RESOURCE_BUNDLE" "$CONTENTS/Resources/"
-# App Store validation reads the manifest from the app bundle's resource root;
-# the copy inside the SwiftPM resource bundle alone is not enough.
-cp "$PRIVACY_MANIFEST" "$CONTENTS/Resources/PrivacyInfo.xcprivacy"
 
 echo "==> Generating app icon…"
 swift Scripts/make-icon.swift "$BUILD_DIR"
-iconutil -c icns "$BUILD_DIR/AppIcon.iconset" -o "$CONTENTS/Resources/AppIcon.icns"
+iconutil -c icns "$BUILD_DIR/AppIcon.iconset" -o "$BUILD_DIR/AppIcon.icns"
 rm -rf "$BUILD_DIR/AppIcon.iconset"
 
 echo "==> Writing Info.plist…"
-cat > "$CONTENTS/Info.plist" <<PLIST
+cat > "$BUILD_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -180,19 +178,70 @@ else
     [[ -n "$IDENTITY" ]] || IDENTITY="$(find_codesigning_identity '^Developer ID Application: ')"
 fi
 
-echo "==> Code signing…"
-echo "    entitlements: ${ENTITLEMENTS#"$ROOT"/}"
-if [[ -n "$IDENTITY" ]]; then
-    echo "    identity: $IDENTITY"
-    # Hardened runtime is required once notarization is added; keep it on from
-    # the start so the signed app behaves like the future release.
-    codesign --force --sign "$IDENTITY" --options runtime --timestamp \
-        --entitlements "$ENTITLEMENTS" "$APP_DIR"
-else
-    echo "    no Developer ID identity found — falling back to ad-hoc"
-    codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP_DIR"
-fi
-codesign --verify --strict "$APP_DIR"
+# --- Build and package each architecture --------------------------------------
+APP_DIRS=()
+for ARCH in "${ARCH_LIST[@]}"; do
+    if [[ "$ARCH" == "universal" ]]; then
+        SWIFT_ARCH_ARGS=(--arch arm64 --arch x86_64)
+        APP_SUFFIX=""
+    else
+        SWIFT_ARCH_ARGS=(--arch "$ARCH")
+        APP_SUFFIX="-$ARCH"
+    fi
+
+    echo "==> Building (release): $ARCH…"
+    # Single-arch builds reuse one product directory, so package each
+    # architecture immediately instead of copying them all after the loop.
+    swift build -c release "${SWIFT_ARCH_ARGS[@]}"
+    BIN_DIR="$(swift build -c release "${SWIFT_ARCH_ARGS[@]}" --show-bin-path)"
+    [[ -x "$BIN_DIR/$TARGET_NAME" ]] || die "built binary not found at $BIN_DIR/$TARGET_NAME"
+
+    APP_DIR="$BUILD_DIR/$EFFECTIVE_DISPLAY_NAME$APP_SUFFIX.app"
+    CONTENTS="$APP_DIR/Contents"
+
+    echo "==> Packaging $EFFECTIVE_DISPLAY_NAME$APP_SUFFIX.app…"
+    rm -rf "$APP_DIR"
+    mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+
+    cp "$BIN_DIR/$TARGET_NAME" "$CONTENTS/MacOS/$TARGET_NAME"
+    BINARY_ARCHS="$(lipo -archs "$CONTENTS/MacOS/$TARGET_NAME")"
+    if [[ "$ARCH" == "universal" ]]; then
+        [[ "$BINARY_ARCHS" == *arm64* && "$BINARY_ARCHS" == *x86_64* ]] \
+            || die "expected a universal binary (arm64 + x86_64), got: $BINARY_ARCHS"
+    else
+        [[ "$BINARY_ARCHS" == "$ARCH" ]] || die "expected a $ARCH binary, got: $BINARY_ARCHS"
+    fi
+    echo "    binary architectures: $BINARY_ARCHS"
+
+    # Bundle.module resolves this resource bundle from the library target's
+    # Resources directory (the binary target name differs from the library's).
+    RESOURCE_BUNDLE="$(ls -d "$BIN_DIR/${PACKAGE_NAME}_"*.bundle 2>/dev/null | head -1)"
+    [[ -n "$RESOURCE_BUNDLE" ]] || die "resource bundle not found in $BIN_DIR"
+    cp -R "$RESOURCE_BUNDLE" "$CONTENTS/Resources/"
+    # App Store validation reads the manifest from the app bundle's resource root;
+    # the copy inside the SwiftPM resource bundle alone is not enough.
+    cp "$PRIVACY_MANIFEST" "$CONTENTS/Resources/PrivacyInfo.xcprivacy"
+    cp "$BUILD_DIR/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
+    cp "$BUILD_DIR/Info.plist" "$CONTENTS/Info.plist"
+
+    echo "==> Code signing…"
+    echo "    entitlements: ${ENTITLEMENTS#"$ROOT"/}"
+    if [[ -n "$IDENTITY" ]]; then
+        echo "    identity: $IDENTITY"
+        # Hardened runtime is required once notarization is added; keep it on
+        # from the start so the signed app behaves like the future release.
+        codesign --force --sign "$IDENTITY" --options runtime --timestamp \
+            --entitlements "$ENTITLEMENTS" "$APP_DIR"
+    else
+        echo "    no Developer ID identity found — falling back to ad-hoc"
+        codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP_DIR"
+    fi
+    codesign --verify --strict "$APP_DIR"
+
+    APP_DIRS+=("$APP_DIR")
+done
+
+rm -f "$BUILD_DIR/Info.plist" "$BUILD_DIR/AppIcon.icns"
 
 # --- Mac App Store package ----------------------------------------------------
 if [[ "$MAS" == "1" ]]; then
@@ -205,10 +254,14 @@ if [[ "$MAS" == "1" ]]; then
     fi
     [[ -n "$INSTALLER_IDENTITY" ]] \
         || die "MAS=1 needs an installer certificate (Mac Installer Distribution) — set INSTALLER_IDENTITY"
+    MAS_APP_DIR="$BUILD_DIR/$EFFECTIVE_DISPLAY_NAME.app"
     PKG="$BUILD_DIR/$APP_DISPLAY_NAME-$VERSION-$BUILD.pkg"
     echo "==> Packaging $PKG…"
-    productbuild --component "$APP_DIR" /Applications --sign "$INSTALLER_IDENTITY" "$PKG"
+    productbuild --component "$MAS_APP_DIR" /Applications --sign "$INSTALLER_IDENTITY" "$PKG"
     echo "    installer identity: $INSTALLER_IDENTITY"
 fi
 
-echo "==> Done: $APP_DIR"
+echo "==> Done:"
+for APP_DIR in "${APP_DIRS[@]}"; do
+    echo "    $APP_DIR ($(lipo -archs "$APP_DIR/Contents/MacOS/$TARGET_NAME"))"
+done

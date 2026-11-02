@@ -24,16 +24,18 @@ instead of a developer's home path.
 - `make test` — run the test suite (`swift test`)
 - `make check-l10n` — verify both `Localizable.strings` files have the same keys
 - `make build` — release build
-- `make app` — assemble `build/<Display Name>.app` (universal release build,
-  unsandboxed, Developer ID when the keychain has one, otherwise ad-hoc)
-- `make install` — `make app`, then replace `/Applications/<Display Name>.app`
-  with the fresh bundle; quit the running copy first (see the code-signature
-  `SIGKILL` gotcha below)
-- `make mas` — assemble the sandboxed App Store build and
+- `make app` — assemble `build/<Display Name>-<arch>.app` for arm64 and x86_64
+  (unsandboxed, Developer ID when the keychain has one, otherwise ad-hoc);
+  `ARCHS` selects a subset, e.g. `ARCHS=arm64 make app`
+- `make install` — assemble the host-arch bundle, then replace
+  `/Applications/<Display Name>.app` with it; quit the running copy first (see
+  the code-signature `SIGKILL` gotcha below)
+- `make mas` — assemble the sandboxed universal App Store build and
   `build/<Display Name>-<version>-<build>.pkg` (Apple Distribution;
   `PROVISION_PROFILE` embeds a TestFlight profile)
-- `make launch` — assemble and open `build/<Display Name>-Dev.app` with bundle
-  ID `<bundleID>.dev` and its own TCC grants and UserDefaults
+- `make launch` — assemble and open `build/<Display Name>-Dev-<arch>.app` for
+  the host architecture, with bundle ID `<bundleID>.dev` and its own TCC grants
+  and UserDefaults
 - `make rename NEW=MyApp ID=com.me.MyApp` — full template rename (see below)
 - `make template-diff SOURCE=/path/to/swiftui-starter` — show drift in
   template-managed files (see `TEMPLATE.md`)
@@ -183,9 +185,11 @@ instead of a developer's home path.
   was already granted. `make app` prefers Developer ID, whose grants survive
   rebuilds; `make launch` uses the separate `.dev` identity. Do not work around
   a TCC prompt by disabling checks.
-- With `--arch arm64 --arch x86_64`, SwiftPM puts products in
-  `.build/apple/Products/Release`, not `.build/release`. Ask
-  `swift build … --show-bin-path` instead of hardcoding the path.
+- With `--arch`, SwiftPM puts products outside `.build/release` in a
+  toolchain-specific products directory (older toolchains use
+  `.build/apple/Products/Release`). Ask `swift build … --show-bin-path` instead
+  of hardcoding the path. Single-arch builds can reuse one output directory, so
+  `make-app.sh` packages each architecture before starting the next build.
 - Rebuilding while an instance is running replaces the executable on disk;
   macOS can then kill that instance with `SIGKILL (Code Signature Invalid)`
   when it next faults in the changed code pages (often during quit). That is

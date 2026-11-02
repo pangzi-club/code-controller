@@ -95,7 +95,7 @@ fi
 
 echo "==> Done. Next:"
 echo "    make dev      # debug run"
-echo "    make app      # assemble ${NEW}.app"
+echo "    make app      # assemble ${NEW}-<arch>.app"
 echo "    swift test"
 echo "Note: the UserDefaults domain follows the bundle ID, so previously saved"
 echo "state (folders, theme, window frame) will not carry over."

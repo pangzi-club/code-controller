@@ -37,10 +37,11 @@ swift test    # or: make test
 
 There is also a `Makefile` with npm-scripts style shortcuts: `make dev` (debug
 run), `make test`, `make check-l10n` (verify localization key parity),
-`make app` (assemble the distribution .app), `make install` (assemble and
-replace the copy in /Applications), `make launch` (assemble and open the dev
-build), `make mas` (App Store package), `make build`, `make rename` (template
-rename), `make template-diff` (show template drift), `make clean`.
+`make app` (assemble arm64 and x86_64 bundles), `make install` (assemble the
+host-arch bundle and replace the copy in /Applications), `make launch`
+(assemble and open the dev build), `make mas` (App Store package), `make build`,
+`make rename` (template rename), `make template-diff` (show template drift),
+`make clean`.
 Run `make help` to list them. `.vscode/launch.json` provides Debug/Release
 launch targets for the VS Code Swift extension; `rename.sh` updates them.
 
@@ -102,22 +103,25 @@ hand.
 ## Packaging as a .app
 
 For the proper experience (Dock icon, menu bar, Cmd+Tab, double-clickable in
-Finder), assemble an app bundle:
+Finder), assemble app bundles — one per architecture:
 
 ```bash
-make app                    # build/DemoExplorer.app
-make launch                 # build/DemoExplorer-Dev.app, opened
-make install                # make app, then replace /Applications/DemoExplorer.app
+make app                    # build/DemoExplorer-arm64.app + build/DemoExplorer-x86_64.app
+make launch                 # build/DemoExplorer-Dev-<host arch>.app, opened
+make install                # host-arch build, then replace /Applications/DemoExplorer.app
 ```
 
-`make-app.sh` builds a universal (arm64 + x86_64) release binary, generates the
-app icon (`Scripts/make-icon.swift` draws it programmatically), writes the
-Info.plist from `AppInfo.swift` (display name, bundle ID, marketing version and
-build number) and `Package.swift` (minimum macOS), and copies the privacy
-manifest. `make app` signs with `Scripts/App.entitlements` and uses a Developer
-ID certificate when the keychain has one (ad-hoc fallback); `SIGN_IDENTITY`
-overrides the choice. Local and Developer ID builds are **not sandboxed** by
-default — add local or hardened-runtime entitlements to that file when needed.
+`make-app.sh` builds a release bundle for each architecture — arm64 and x86_64
+by default, so Apple Silicon and Intel Macs each get a native app. Set `ARCHS`
+to build a subset, e.g. `ARCHS=arm64 ./Scripts/make-app.sh`. Each bundle gets
+the generated app icon (`Scripts/make-icon.swift` draws it programmatically),
+an Info.plist written from `AppInfo.swift` (display name, bundle ID, marketing
+version and build number) and `Package.swift` (minimum macOS), and a copy of
+the privacy manifest. `make app` signs each bundle with
+`Scripts/App.entitlements` and uses a Developer ID certificate when the keychain
+has one (ad-hoc fallback); `SIGN_IDENTITY` overrides the choice. Local and
+Developer ID builds are **not sandboxed** by default — add local or
+hardened-runtime entitlements to that file when needed.
 
 The App Store build is sandboxed, so the demo persists app-scoped security
 bookmarks for its folders instead of plain paths — a path alone loses access
@@ -127,10 +131,11 @@ during `swift run` or `make app` do not carry over to the App Store build.
 `CFBundleLocalizations` is declared in the generated `Info.plist` so the
 standard AppKit menus follow the in-app language.
 
-`make launch` builds a separate dev identity: the bundle ID gets a `.dev`
-suffix and the display name a `-Dev` suffix. TCC grants and UserDefaults are
-keyed by bundle ID (and, when sandboxed, the container), so rebuilding the dev
-app does not invalidate the shipping app's permissions (and vice versa).
+`make launch` builds a separate dev identity for the host architecture: the
+bundle ID gets a `.dev` suffix and the display name a `-Dev` suffix. TCC grants
+and UserDefaults are keyed by bundle ID (and, when sandboxed, the container), so
+rebuilding the dev app does not invalidate the shipping app's permissions (and
+vice versa).
 
 ### App Store
 
@@ -139,7 +144,8 @@ make mas                    # build/DemoExplorer-0.1-1.pkg
 ```
 
 `make mas` signs with Apple Distribution and writes a `.pkg` for Transporter.
-It signs with `Scripts/App.sandbox.entitlements` and refuses to run unless App
+The package contains a single universal (arm64 + x86_64) sandboxed bundle. It
+signs with `Scripts/App.sandbox.entitlements` and refuses to run unless App
 Sandbox is enabled there. Bump `AppInfo.build` for every upload
 (`CFBundleVersion`); `CFBundleShortVersionString` comes from `AppInfo.version`.
 A normal App Store submission does not need a provisioning profile, but
@@ -179,7 +185,7 @@ Scripts/
 ├── App.entitlements              # Local/Developer ID entitlements (unsandboxed)
 ├── App.sandbox.entitlements      # App Store: sandbox + user-selected files + bookmarks
 ├── check-l10n.py                 # Localization key parity check
-├── make-app.sh                   # Universal release build + .app/.pkg assembly
+├── make-app.sh                   # Per-architecture release builds + .app/.pkg assembly
 ├── make-icon.swift               # Programmatic app icon generator
 ├── rename.sh                     # One-shot template rename
 └── template-diff.sh              # Read-only drift check against a starter checkout
