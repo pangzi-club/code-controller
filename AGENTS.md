@@ -26,6 +26,9 @@ instead of a developer's home path.
 - `make build` — release build
 - `make app` — assemble `build/<Display Name>.app` (universal release build,
   unsandboxed, Developer ID when the keychain has one, otherwise ad-hoc)
+- `make install` — `make app`, then replace `/Applications/<Display Name>.app`
+  with the fresh bundle; quit the running copy first (see the code-signature
+  `SIGKILL` gotcha below)
 - `make mas` — assemble the sandboxed App Store build and
   `build/<Display Name>-<version>-<build>.pkg` (Apple Distribution;
   `PROVISION_PROFILE` embeds a TestFlight profile)

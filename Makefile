@@ -28,6 +28,10 @@ check-l10n: ## Verify Localizable.strings key parity across languages
 app: ## Assemble the distribution .app bundle (Developer ID or ad-hoc)
 	./Scripts/make-app.sh
 
+install: app ## Assemble the .app and install it into /Applications
+	rm -rf "/Applications/$(APP_DISPLAY_NAME).app"
+	ditto "$(APP_PATH)" "/Applications/$(APP_DISPLAY_NAME).app"
+
 mas: ## Assemble the App Store build and .pkg (Apple Distribution)
 	MAS=1 ./Scripts/make-app.sh
 
@@ -47,4 +51,4 @@ clean: ## Remove build artifacts
 	swift package clean
 	rm -rf build/
 
-.PHONY: help dev build test check-l10n app mas launch rename template-diff clean
+.PHONY: help dev build test check-l10n app install mas launch rename template-diff clean

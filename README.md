@@ -37,9 +37,10 @@ swift test    # or: make test
 
 There is also a `Makefile` with npm-scripts style shortcuts: `make dev` (debug
 run), `make test`, `make check-l10n` (verify localization key parity),
-`make app` (assemble the distribution .app), `make launch` (assemble and open
-the dev build), `make mas` (App Store package), `make build`, `make rename`
-(template rename), `make template-diff` (show template drift), `make clean`.
+`make app` (assemble the distribution .app), `make install` (assemble and
+replace the copy in /Applications), `make launch` (assemble and open the dev
+build), `make mas` (App Store package), `make build`, `make rename` (template
+rename), `make template-diff` (show template drift), `make clean`.
 Run `make help` to list them. `.vscode/launch.json` provides Debug/Release
 launch targets for the VS Code Swift extension; `rename.sh` updates them.
 
@@ -106,6 +107,7 @@ Finder), assemble an app bundle:
 ```bash
 make app                    # build/DemoExplorer.app
 make launch                 # build/DemoExplorer-Dev.app, opened
+make install                # make app, then replace /Applications/DemoExplorer.app
 ```
 
 `make-app.sh` builds a universal (arm64 + x86_64) release binary, generates the

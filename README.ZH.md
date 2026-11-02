@@ -31,7 +31,7 @@ swift run
 swift test    # 或：make test
 ```
 
-项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装分发用 .app）、`make launch`（组装并打开开发版）、`make mas`（App Store 安装包）、`make build`、`make rename`（模板重命名）、`make template-diff`（查看与模板的差异）、`make clean`。运行 `make help` 查看全部。`.vscode/launch.json` 提供 VS Code Swift 扩展的 Debug/Release 启动配置，`rename.sh` 会同步更新目标名。
+项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装分发用 .app）、`make install`（组装并替换 /Applications 中的副本）、`make launch`（组装并打开开发版）、`make mas`（App Store 安装包）、`make build`、`make rename`（模板重命名）、`make template-diff`（查看与模板的差异）、`make clean`。运行 `make help` 查看全部。`.vscode/launch.json` 提供 VS Code Swift 扩展的 Debug/Release 启动配置，`rename.sh` 会同步更新目标名。
 
 ## 验证 UI
 
@@ -73,6 +73,7 @@ swift test    # 或：make test
 ```bash
 make app                    # 产物：build/DemoExplorer.app
 make launch                 # 产物：build/DemoExplorer-Dev.app，并打开
+make install                # make app 后替换 /Applications/DemoExplorer.app
 ```
 
 `make-app.sh` 会构建 universal（arm64 + x86_64）release 二进制、生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist，并复制隐私清单。`make app` 使用 `Scripts/App.entitlements` 签名，优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。本地和 Developer ID 构建**默认不开启沙盒**，需要本地或 hardened runtime 权限时往该文件里加。
