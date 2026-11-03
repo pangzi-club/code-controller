@@ -8,6 +8,8 @@ import os
 public struct Log {
     public static let app = Log(category: "app")
     public static let files = Log(category: "files")
+    public static let tree = Log(category: "tree")
+    public static let editor = Log(category: "editor")
     public static let window = Log(category: "window")
 
     private static let subsystem = AppInfo.bundleID

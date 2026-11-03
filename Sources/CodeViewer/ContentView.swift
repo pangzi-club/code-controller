@@ -1,33 +1,34 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// What the detail pane currently shows: the selected sidebar folder.
-enum SidebarSelection: Hashable {
-    case folder(UUID)
-}
-
 public struct ContentView: View {
-    @StateObject private var store = FolderStore()
-    @State private var selection: SidebarSelection?
+    @State private var workspaces = WorkspaceStore()
+    @State private var sessions = WorkspaceSessions()
+    @State private var selectedWorkspaceID: Workspace.ID?
+    @State private var session: WorkspaceSession?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var toolbarStripHeight: CGFloat = 52
     @State private var isFullScreen = false
-    @State private var isChoosingFolder = false
+    @State private var isChoosingWorkspace = false
 
     public init() {}
 
     public var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(
-                store: store,
-                selection: $selection,
+                store: workspaces,
+                selection: $selectedWorkspaceID,
+                session: session,
                 topPadding: isFullScreen ? 8 : toolbarStripHeight + 8,
-                onAddFolder: presentFolderPicker
+                onSelect: select,
+                onAdd: presentWorkspacePicker,
+                onRemove: removeWorkspace,
+                onDropURL: addWorkspace
             )
-                .toolbar(removing: .sidebarToggle)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+            .toolbar(removing: .sidebarToggle)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 280)
         } detail: {
-            detailContent
+            detail
                 .overlay(alignment: .top) {
                     if !isFullScreen {
                         pageColor
@@ -69,28 +70,80 @@ public struct ContentView: View {
             }
         )
         .background(WindowChrome(isFullScreen: $isFullScreen))
-        .onAppear {
-            if selection == nil {
-                selection = store.folders.first.map { .folder($0.id) }
-            }
-        }
+        .onAppear(perform: selectInitialWorkspaceIfNeeded)
         .fileImporter(
-            isPresented: $isChoosingFolder,
+            isPresented: $isChoosingWorkspace,
             allowedContentTypes: [.folder]
         ) { result in
             switch result {
             case .success(let url):
-                if let folder = store.add(url) {
-                    selection = .folder(folder.id)
-                }
+                addWorkspace(url)
             case .failure(let error):
-                Log.files.error("Folder picker failed: \(error.localizedDescription)")
+                Log.files.error("Workspace picker failed: \(error.localizedDescription)")
             }
         }
     }
 
     private var pageColor: Color {
         Color(nsColor: .controlBackgroundColor)
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        if let workspace = selectedWorkspace, let session {
+            WorkspaceDetailView(workspace: workspace, session: session) {
+                Task {
+                    await session.tree.reload()
+                    session.document.reload()
+                }
+            }
+        } else {
+            PlaceholderView(addWorkspace: presentWorkspacePicker)
+        }
+    }
+
+    private var selectedWorkspace: Workspace? {
+        workspaces.workspaces.first { $0.id == selectedWorkspaceID }
+    }
+
+    private func selectInitialWorkspaceIfNeeded() {
+        guard session == nil, let first = workspaces.workspaces.first else { return }
+        select(first)
+    }
+
+    private func select(_ workspace: Workspace) {
+        let newSession = sessions.session(for: workspace)
+        selectedWorkspaceID = workspace.id
+        session = newSession
+        Task { await newSession.loadIfNeeded() }
+    }
+
+    private func addWorkspace(_ url: URL) {
+        guard let workspace = workspaces.add(url) else { return }
+        select(workspace)
+    }
+
+    private func removeWorkspace(_ workspace: Workspace) {
+        let wasSelected = selectedWorkspaceID == workspace.id
+        sessions.remove(workspace)
+        workspaces.remove(workspace)
+        guard wasSelected else { return }
+
+        session = nil
+        selectedWorkspaceID = nil
+        if let first = workspaces.workspaces.first {
+            select(first)
+        }
+    }
+
+    private func presentWorkspacePicker() {
+        isChoosingWorkspace = true
+    }
+
+    private func toggleSidebar() {
+        withAnimation {
+            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        }
     }
 
     /// Keeps the page-colored strip above the detail column in sync with the
@@ -101,38 +154,158 @@ public struct ContentView: View {
         guard height > 0.5, abs(height - toolbarStripHeight) > 0.5 else { return }
         toolbarStripHeight = height
     }
+}
+
+// MARK: - Detail
+
+private struct WorkspaceDetailView: View {
+    let workspace: Workspace
+    let session: WorkspaceSession
+    let onRefresh: () -> Void
+
+    private var title: String {
+        session.document.url?.lastPathComponent ?? workspace.name
+    }
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1)
+                }
+                // hiddenTitleBar leaves no trailing flexible region; without this
+                // the primary actions pack next to the title.
+                ToolbarItem {
+                    Spacer()
+                }
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        FileOpener.reveal(session.document.url ?? workspace.url)
+                    } label: {
+                        Label {
+                            l10n("Show in Finder")
+                        } icon: {
+                            Image(systemName: "arrow.up.forward.app")
+                                .frame(width: 16, height: 16)
+                        }
+                    }
+                    .help(l10nString("Show in Finder"))
+                    Button(action: onRefresh) {
+                        Label {
+                            l10n("Refresh")
+                        } icon: {
+                            Image(systemName: "arrow.clockwise")
+                                .frame(width: 16, height: 16)
+                        }
+                    }
+                    .help(l10nString("Refresh"))
+                    // Toolbar adds 8pt; match the visible glyph to the card's 20pt inset.
+                    .padding(.trailing, 7)
+                }
+            }
+    }
 
     @ViewBuilder
-    private var detailContent: some View {
-        switch selection {
-        case .folder(let id):
-            if let folder = store.folders.first(where: { $0.id == id }) {
-                FileListView(folder: folder)
-                    .id(folder.id)
+    private var content: some View {
+        switch session.document.state {
+        case .empty:
+            StatusView(
+                icon: "doc.text",
+                message: l10n("Select a file to view")
+            )
+        case .loading:
+            ProgressView()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .text(let document):
+            if document.text.isEmpty {
+                StatusView(icon: "doc", message: l10n("This file is empty"))
             } else {
-                placeholder
+                CodeView(
+                    text: document.text,
+                    documentID: "\(session.document.url?.path ?? "")#\(session.document.revision)"
+                )
             }
-        case nil:
-            placeholder
-        }
-    }
-
-    private var placeholder: some View {
-        PlaceholderView(hasFolders: !store.folders.isEmpty) {
-            presentFolderPicker()
-        }
-    }
-
-    private func presentFolderPicker() {
-        isChoosingFolder = true
-    }
-
-    private func toggleSidebar() {
-        withAnimation {
-            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        case .binary:
+            StatusView(
+                icon: "doc.zipper",
+                message: l10n("Binary file"),
+                detail: l10n("This file can't be displayed as text.")
+            )
+        case .tooLarge(let byteSize):
+            StatusView(
+                icon: "doc",
+                message: l10n("File too large"),
+                detail: l10n(
+                    "This file is %@ and too large to display.",
+                    ByteCountFormatter.string(fromByteCount: byteSize, countStyle: .file)
+                )
+            )
+        case .failed:
+            StatusView(
+                icon: "exclamationmark.triangle",
+                message: l10n("Couldn't read this file. It may have been moved or deleted.")
+            )
         }
     }
 }
+
+private struct PlaceholderView: View {
+    let addWorkspace: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "folder")
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(.secondary.opacity(0.5))
+                .padding(24)
+                .background(Circle().fill(Color.primary.opacity(0.04)))
+            l10n("Add a workspace to get started")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.secondary)
+            Button(action: addWorkspace) {
+                l10n("Add Workspace…")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+}
+
+private struct StatusView: View {
+    let icon: String
+    let message: Text
+    var detail: Text?
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(.secondary.opacity(0.4))
+            message
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            if let detail {
+                detail
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Window chrome
 
 /// Tracks full screen and keeps the window toolbar hidden while in it.
 ///
@@ -283,254 +456,10 @@ private struct WindowChrome: NSViewRepresentable {
     }
 }
 
-private struct PlaceholderView: View {
-    let hasFolders: Bool
-    let addFolder: () -> Void
-
-    private var message: String {
-        hasFolders ? "Select a folder on the left" : "Add a folder to get started"
-    }
-
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "folder")
-                .font(.system(size: 40, weight: .light))
-                .foregroundColor(.secondary.opacity(0.5))
-                .padding(24)
-                .background(Circle().fill(Color.primary.opacity(0.04)))
-            l10n(message)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.secondary)
-            if !hasFolders {
-                Button(action: addFolder) {
-                    l10n("Add Folder")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-}
-
-// MARK: - Sidebar
-
-private struct SidebarView: View {
-    @ObservedObject var store: FolderStore
-    @Binding var selection: SidebarSelection?
-    let topPadding: CGFloat
-    let onAddFolder: () -> Void
-
-    @State private var hoveredFolderID: UUID?
-    @State private var addHovered = false
-    @State private var dropTargeted = false
-
-    private var selectedFolderID: UUID? {
-        if case .folder(let id) = selection { return id }
-        return nil
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                l10n("Folders")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.secondary)
-                Spacer()
-                if !store.folders.isEmpty {
-                    Text("\(store.folders.count)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.primary.opacity(0.06)))
-                }
-            }
-            .frame(height: 20)
-            .padding(.horizontal, 16)
-            .padding(.top, topPadding)
-            .padding(.bottom, 8)
-
-            if store.folders.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 30, weight: .light))
-                        .foregroundColor(.secondary.opacity(0.4))
-                    l10n("Click the button below to add a folder")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(store.folders) { folder in
-                            let isSelected = folder.id == selectedFolderID
-                            Button {
-                                selection = .folder(folder.id)
-                            } label: {
-                                SidebarRowView(
-                                    folder: folder,
-                                    isSelected: isSelected,
-                                    isHovered: folder.id == hoveredFolderID
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                            .onHover { hovering in
-                                hoveredFolderID = hovering ? folder.id : nil
-                            }
-                            .contextMenu {
-                                Button(action: { FileOpener.reveal(folder.url) }) {
-                                    l10n("Show in Finder")
-                                }
-                                Divider()
-                                Button(role: .destructive) {
-                                    if selectedFolderID == folder.id { selection = nil }
-                                    store.remove(folder)
-                                } label: {
-                                    l10n("Remove")
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                }
-            }
-
-            addButton
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
-                .padding(.bottom, 12)
-        }
-        // The sidebar is drawn under the transparent titlebar; reserve the
-        // traffic-light strip in the header padding instead of letting
-        // NavigationSplitView add its own (doubled) top inset. No background is
-        // painted here: the split view's native translucent sidebar material
-        // shows the desktop through.
-        .ignoresSafeArea(.container, edges: .top)
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first else { return false }
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
-                  isDirectory.boolValue else { return false }
-            if let folder = store.add(url) {
-                selection = .folder(folder.id)
-            }
-            return true
-        } isTargeted: { dropTargeted = $0 }
-        .overlay {
-            if dropTargeted {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.accentColor, lineWidth: 2)
-                    )
-                    .padding(5)
-                    .allowsHitTesting(false)
-            }
-        }
-    }
-
-    private var addButton: some View {
-        Button(action: onAddFolder) {
-            HStack(spacing: 10) {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(addHovered ? .primary : .secondary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(Color.primary.opacity(0.06))
-                    )
-                l10n("Add Folder")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.secondary)
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(addHovered ? Color.primary.opacity(0.05) : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { addHovered = $0 }
-    }
-}
-
-private struct SidebarRowView: View {
-    let folder: Folder
-    let isSelected: Bool
-    let isHovered: Bool
-
-    private var tint: Color { FolderPalette.color(for: folder.url.path) }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(tint.gradient)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                )
-                .shadow(color: tint.opacity(0.4), radius: 2, y: 1)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(folder.name)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                    .foregroundColor(isSelected ? .white : .primary)
-                    .lineLimit(1)
-                Text(folder.url.abbreviatedPath)
-                    .font(.system(size: 10))
-                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color.accentColor : isHovered ? Color.primary.opacity(0.05) : Color.clear)
-        )
-        .contentShape(Rectangle())
-    }
-}
-
-enum FolderPalette {
-    static let colors: [Color] = [.blue, .purple, .pink, .red, .orange, .green, .teal, .cyan, .indigo, .brown]
-
-    /// djb2 hash: `hashValue` changes on every launch, this keeps each folder's
-    /// color stable across launches.
-    static func color(for path: String) -> Color {
-        var hash: UInt64 = 5381
-        for byte in path.utf8 {
-            hash = (hash &<< 5) &+ hash &+ UInt64(byte)
-        }
-        return colors[Int(hash % UInt64(colors.count))]
-    }
-}
-
-extension URL {
-    /// Replaces the home directory prefix with "~" for display.
-    var abbreviatedPath: String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        guard path == home || path.hasPrefix(home + "/") else { return path }
-        return "~" + path.dropFirst(home.count)
-    }
-}
-
+#if DEBUG
 #Preview {
     ContentView()
         .frame(width: 1080, height: 720)
         .background(Color(nsColor: .controlBackgroundColor))
 }
+#endif
