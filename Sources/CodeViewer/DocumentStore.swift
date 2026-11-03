@@ -5,6 +5,7 @@ enum DocumentState {
     case empty
     case loading
     case text(TextDocument)
+    case image(ImageDocument)
     case binary
     case tooLarge(byteSize: Int64)
     case failed
@@ -51,7 +52,7 @@ final class DocumentStore {
     /// so a watcher burst touching unrelated files does not invalidate every
     /// open tab's highlight cache.
     func reloadIfChanged() {
-        guard let url, case .text = state else { return }
+        guard let url, isReloadableState else { return }
         let values = try? url.resourceValues(
             forKeys: [.contentModificationDateKey, .fileSizeKey]
         )
@@ -61,6 +62,15 @@ final class DocumentStore {
             return
         }
         load(from: url)
+    }
+
+    /// States that hold file content worth re-checking on watcher events:
+    /// text documents and image previews.
+    private var isReloadableState: Bool {
+        switch state {
+        case .text, .image: return true
+        default: return false
+        }
     }
 
     private func load(from url: URL) {
@@ -86,6 +96,10 @@ final class DocumentStore {
                 self.lastReadModificationDate = document.modificationDate
                 self.lastReadByteSize = document.byteSize
                 self.state = .text(document)
+            case .image(let document):
+                self.lastReadModificationDate = document.modificationDate
+                self.lastReadByteSize = document.byteSize
+                self.state = .image(document)
             case .binary: self.state = .binary
             case .tooLarge(let byteSize): self.state = .tooLarge(byteSize: byteSize)
             case nil: self.state = .failed

@@ -323,6 +323,8 @@ private struct WorkspaceDetailView: View {
                 if document.text.isEmpty {
                     StatusView(icon: "doc", message: l10n("This file is empty"))
                 }
+            case .image(let document):
+                ImageContentView(document: document)
             case .binary:
                 StatusView(
                     icon: "doc.zipper",

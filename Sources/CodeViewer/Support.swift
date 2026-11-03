@@ -65,7 +65,8 @@ enum FileIcon {
             return "curlybraces"
         case "md", "markdown", "txt", "rtf", "log":
             return "doc.text"
-        case "png", "jpg", "jpeg", "gif", "svg", "webp", "heic", "tiff", "pdf":
+        case "png", "jpg", "jpeg", "gif", "svg", "webp", "heic", "heif",
+             "tiff", "tif", "bmp", "avif", "pdf":
             return "photo"
         case "swift", "js", "jsx", "ts", "tsx", "mjs", "cjs", "py", "rb", "go", "rs",
              "c", "h", "cc", "cpp", "hpp", "m", "mm", "java", "kt", "kts", "cs", "php",

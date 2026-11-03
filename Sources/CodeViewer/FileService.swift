@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum FileServiceError: Error {
@@ -13,8 +14,24 @@ struct TextDocument: Sendable, Equatable {
     let modificationDate: Date?
 }
 
+/// A previewable image file. NSImage is documented thread-safe, so the
+/// FileService actor can build one off the main thread; identity equality is
+/// enough because each read decodes a fresh instance.
+struct ImageDocument: @unchecked Sendable, Equatable {
+    let image: NSImage
+    let byteSize: Int
+    let modificationDate: Date?
+
+    static func == (lhs: ImageDocument, rhs: ImageDocument) -> Bool {
+        lhs.image === rhs.image
+            && lhs.byteSize == rhs.byteSize
+            && lhs.modificationDate == rhs.modificationDate
+    }
+}
+
 enum DocumentContent: Sendable, Equatable {
     case text(TextDocument)
+    case image(ImageDocument)
     case binary
     case tooLarge(byteSize: Int64)
 }
@@ -81,6 +98,14 @@ actor FileService {
 
     private static let skippedDirectoryNames: Set<String> = [".git"]
 
+    /// Extensions that open as an image preview instead of a text view.
+    /// Corrupted files in these formats still fall through to the binary
+    /// verdict, so the failure path stays the existing one.
+    static let imageExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "gif", "svg", "webp", "heic", "heif",
+        "tiff", "tif", "bmp", "avif",
+    ]
+
     private let maximumTextFileSize: Int64
 
     init(maximumTextFileSize: Int64 = FileService.defaultMaximumTextFileSize) {
@@ -125,6 +150,15 @@ actor FileService {
 
         let size = Int64(values.fileSize ?? 0)
         guard size <= maximumTextFileSize else { return .tooLarge(byteSize: size) }
+
+        if Self.imageExtensions.contains(url.pathExtension.lowercased()),
+           let image = NSImage(contentsOf: url) {
+            return .image(ImageDocument(
+                image: image,
+                byteSize: Int(size),
+                modificationDate: values.contentModificationDate
+            ))
+        }
 
         let data = try Data(contentsOf: url)
         guard let decoded = TextDecoder.decode(data) else { return .binary }

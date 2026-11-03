@@ -10,6 +10,12 @@ struct FileServiceTests {
         return url
     }
 
+    private func makeOnePixelPNG() throws -> Data {
+        try #require(Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
+                + "AAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="))
+    }
+
     // MARK: - Children
 
     @Test("one level is listed with directories first; dot-files stay, .git does not")
@@ -110,6 +116,51 @@ struct FileServiceTests {
             _ = try await FileService().readDocument(at: missing)
             Issue.record("expected a read error")
         } catch {}
+    }
+
+    @Test("image files decode into image documents")
+    func readsImages() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let png = try makeOnePixelPNG()
+        let url = root.appendingPathComponent("pixel.png")
+        try png.write(to: url)
+
+        let content = try await FileService().readDocument(at: url)
+        guard case .image(let document) = content else {
+            Issue.record("expected image content")
+            return
+        }
+
+        #expect(document.image.size.width > 0)
+        #expect(document.byteSize == png.count)
+    }
+
+    @Test("a corrupted image falls back to the binary verdict")
+    func corruptedImageIsBinary() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        // PNG signature bytes plus a NUL: NSImage rejects it and the text
+        // decoder sees binary, so the existing binary message is shown.
+        let url = root.appendingPathComponent("broken.png")
+        try Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0x11]).write(to: url)
+
+        let content = try await FileService().readDocument(at: url)
+
+        #expect(content == .binary)
+    }
+
+    @Test("an image above the size limit is reported without being read")
+    func largeImageIsTooLarge() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let png = try makeOnePixelPNG()
+        let url = root.appendingPathComponent("big.png")
+        try png.write(to: url)
+
+        let content = try await FileService(maximumTextFileSize: 8).readDocument(at: url)
+
+        #expect(content == .tooLarge(byteSize: Int64(png.count)))
     }
 
     // MARK: - Decoding
