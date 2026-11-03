@@ -136,6 +136,7 @@ public struct ContentView: View {
 // MARK: - Detail
 
 private struct WorkspaceDetailView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let workspace: Workspace
     let session: WorkspaceSession
     /// Room for the traffic lights when the sidebar is collapsed and the
@@ -197,17 +198,24 @@ private struct WorkspaceDetailView: View {
         CodePane(
             tabID: textSelection?.tabID,
             text: textSelection?.text,
-            documentID: textSelection?.documentID
+            documentID: textSelection?.documentID,
+            language: textSelection?.language,
+            theme: HighlightTheme(colorScheme: colorScheme)
         )
     }
 
-    private var textSelection: (tabID: String, text: String, documentID: String)? {
+    private var textSelection: (tabID: String, text: String, documentID: String, language: String?)? {
         guard let tab = session.selectedTab,
               case .text(let document) = tab.document.state,
               !document.text.isEmpty else {
             return nil
         }
-        return (tab.id, document.text, tab.document.versionID)
+        return (
+            tab.id,
+            document.text,
+            tab.document.versionID,
+            SyntaxLanguageMapper.highlightLanguage(forExtension: tab.url.pathExtension)
+        )
     }
 
     /// True while a status/loading view covers the code pane. The pane stays

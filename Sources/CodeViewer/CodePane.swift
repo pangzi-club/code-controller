@@ -5,10 +5,18 @@ import SwiftUI
 /// `capacity`; switching tabs swaps views in O(1) so scroll position and
 /// selection survive. Evicted tabs keep their scroll anchor and are rebuilt
 /// from the tab's `DocumentStore` text when shown again.
+///
+/// Text paints twice: plain first (so content appears instantly), then styled
+/// once the background highlighter finishes. Finished results are cached per
+/// document version and theme, so switching tabs never re-highlights.
 struct CodePane: NSViewRepresentable {
     let tabID: String?
     let text: String?
     let documentID: String?
+    /// Canonical highlight.js language for the file extension, or nil to
+    /// render plain text.
+    let language: String?
+    let theme: HighlightTheme
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -22,9 +30,16 @@ struct CodePane: NSViewRepresentable {
     }
 
     func updateNSView(_ container: NSView, context: Context) {
-        context.coordinator.update(tabID: tabID, text: text, documentID: documentID)
+        context.coordinator.update(
+            tabID: tabID,
+            text: text,
+            documentID: documentID,
+            language: language,
+            theme: theme
+        )
     }
 
+    @MainActor
     final class Coordinator {
         static let capacity = 8
 
@@ -34,6 +49,12 @@ struct CodePane: NSViewRepresentable {
             let editorView: CodeEditorView
             var documentID: String
             var lastUsed: Int
+            var text: String
+            var language: String?
+            /// Theme the editor's current paint was made for; nil means the
+            /// content is stale and needs (re)painting.
+            var appliedTheme: HighlightTheme?
+            var highlightTask: Task<Void, Never>?
         }
 
         private struct SavedState {
@@ -44,35 +65,131 @@ struct CodePane: NSViewRepresentable {
         private var entries: [String: Entry] = [:]
         private var savedStates: [String: SavedState] = [:]
         private var currentTabID: String?
+        private var currentTheme = HighlightTheme.light
         private var clock = 0
+        private let cache = HighlightCache()
+        private let service = HighlightService.shared
 
-        func update(tabID: String?, text: String?, documentID: String?) {
+        func update(
+            tabID: String?,
+            text: String?,
+            documentID: String?,
+            language: String?,
+            theme: HighlightTheme
+        ) {
             guard let container, let tabID, let text, let documentID else { return }
             clock += 1
 
-            if var entry = entries[tabID] {
-                if entry.documentID != documentID {
-                    let state = capture(entry)
-                    entry.editorView.setText(text)
-                    entry.documentID = documentID
-                    restore(state, in: entry)
+            let themeChanged = theme != currentTheme
+            if themeChanged {
+                currentTheme = theme
+                // Hidden editors keep their old paint; mark everything stale
+                // so each one repaints below or on its next update.
+                entries = entries.mapValues { entry in
+                    var entry = entry
+                    entry.appliedTheme = nil
+                    return entry
                 }
-                entry.lastUsed = clock
-                entries[tabID] = entry
-                show(entry, tabID: tabID, in: container)
+            }
+
+            if entries[tabID] == nil {
+                entries[tabID] = Entry(
+                    editorView: CodeEditorView(),
+                    documentID: documentID,
+                    lastUsed: clock,
+                    text: text,
+                    language: language,
+                    appliedTheme: nil,
+                    highlightTask: nil
+                )
+            }
+
+            var entry = entries[tabID]!
+            let contentChanged = entry.documentID != documentID
+            var savedState: SavedState?
+            if contentChanged {
+                savedState = capture(entry)
+                entry.highlightTask?.cancel()
+                entry.highlightTask = nil
+                entry.documentID = documentID
+                entry.text = text
+                entry.language = language
+                entry.appliedTheme = nil
+            }
+            entry.lastUsed = clock
+            entries[tabID] = entry
+
+            if entry.appliedTheme != theme {
+                applyContent(to: tabID, theme: theme)
+            }
+
+            show(entries[tabID]!, tabID: tabID, in: container)
+
+            if let savedState, let entry = entries[tabID] {
+                restore(savedState, in: entry)
+            }
+
+            if themeChanged {
+                for otherID in entries.keys where otherID != tabID {
+                    applyContent(to: otherID, theme: theme)
+                }
+            }
+
+            evictIfNeeded()
+        }
+
+        /// Paints one entry for `theme`: from the cache when possible,
+        /// otherwise plain text first and a styled swap-in once the
+        /// background highlight finishes.
+        private func applyContent(to tabID: String, theme: HighlightTheme) {
+            guard var entry = entries[tabID] else { return }
+            entry.highlightTask?.cancel()
+            entry.highlightTask = nil
+            entry.appliedTheme = theme
+            entries[tabID] = entry
+
+            let editorView = entry.editorView
+            let documentID = entry.documentID
+            let cacheKey = "\(tabID)#\(documentID)"
+
+            if let styled = cache.result(for: cacheKey, theme: theme) {
+                editorView.setAttributedText(styled)
                 return
             }
 
-            let editorView = CodeEditorView()
-            editorView.setText(text)
-            let entry = Entry(
-                editorView: editorView,
-                documentID: documentID,
-                lastUsed: clock
-            )
+            editorView.setText(entry.text)
+            guard let language = entry.language else { return }
+
+            let text = entry.text
+            let task = Task { @MainActor [weak self, weak editorView] in
+                guard let self, let editorView else { return }
+                do {
+                    let raw = try await self.service.highlight(
+                        requestKey: cacheKey,
+                        text: text,
+                        language: language,
+                        theme: theme
+                    )
+                    let styled = CodeTextFactory.styled(raw.attributed)
+                    guard !Task.isCancelled,
+                          let current = self.entries[tabID],
+                          current.editorView === editorView,
+                          current.documentID == documentID,
+                          current.appliedTheme == theme else { return }
+                    self.cache.store(styled, for: cacheKey, theme: theme)
+                    editorView.setAttributedText(styled)
+                } catch is CancellationError {
+                } catch HighlightError.unsupportedLanguage {
+                    // Unknown language: plain text is the graceful fallback,
+                    // already painted.
+                } catch {
+                    Log.editor.error(
+                        "Highlighting \(language) failed: \(error.localizedDescription)"
+                    )
+                }
+            }
+            entry.highlightTask = task
             entries[tabID] = entry
-            show(entry, tabID: tabID, in: container)
-            evictIfNeeded()
         }
 
         private func show(_ entry: Entry, tabID: String, in container: NSView) {
@@ -133,6 +250,7 @@ struct CodePane: NSViewRepresentable {
                 }), let entry = entries[victim] else {
                     break
                 }
+                entry.highlightTask?.cancel()
                 savedStates[victim] = capture(entry)
                 entry.editorView.removeFromSuperview()
                 entries.removeValue(forKey: victim)
@@ -189,10 +307,18 @@ final class CodeEditorView: NSView {
     }
 
     func setText(_ text: String) {
-        textView.textStorage?.setAttributedString(
+        setAttributedText(
             NSAttributedString(string: text, attributes: CodeTextFactory.attributes())
         )
-        lineNumberView.update(text: text)
+    }
+
+    /// The attributed string must carry the pinned paragraph style and font
+    /// metrics (see `CodeTextFactory.styled`) — the ruler assumes one fixed
+    /// line height. Content characters stay identical between the plain and
+    /// highlighted paint.
+    func setAttributedText(_ attributed: NSAttributedString) {
+        textView.textStorage?.setAttributedString(attributed)
+        lineNumberView.update(text: attributed.string)
     }
 }
 
@@ -258,6 +384,39 @@ enum CodeTextFactory {
         ]
     }
 
+    /// Merges a highlighter's output with the pane's pinned metrics: keeps the
+    /// color attributes, swaps the font for the fixed mono font (preserving
+    /// bold/italic traits when the theme offers them) and forces the pinned
+    /// paragraph style so the line-number ruler stays aligned. Characters are
+    /// never changed.
+    static func styled(_ highlighted: NSAttributedString) -> NSAttributedString {
+        let result = NSMutableAttributedString(attributedString: highlighted)
+        guard result.length > 0 else { return result }
+
+        let full = NSRange(location: 0, length: result.length)
+        let paragraph = paragraphStyle()
+        result.enumerateAttributes(in: full) { attributes, range, _ in
+            var styledAttributes = attributes
+            styledAttributes[.paragraphStyle] = paragraph
+            styledAttributes[.font] = font(matching: attributes[.font] as? NSFont)
+            styledAttributes[.foregroundColor] =
+                attributes[.foregroundColor] as? NSColor ?? NSColor.labelColor
+            // Themes stamp their own background on spans; the pane decides
+            // the background.
+            styledAttributes[.backgroundColor] = nil
+            result.setAttributes(styledAttributes, range: range)
+        }
+        return result
+    }
+
+    private static func font(matching themed: NSFont?) -> NSFont {
+        guard let themed else { return font }
+        let traits = themed.fontDescriptor.symbolicTraits
+        guard !traits.isEmpty else { return font }
+        let descriptor = font.fontDescriptor.withSymbolicTraits(traits)
+        return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
+    }
+
     private static func paragraphStyle() -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.minimumLineHeight = lineHeight
@@ -275,7 +434,9 @@ enum CodeTextFactory {
     CodePane(
         tabID: "preview",
         text: "struct Hello {\n\tlet message = \"Hello, Code Viewer\"\n}\n",
-        documentID: "preview#1"
+        documentID: "preview#1",
+        language: "swift",
+        theme: .light
     )
     .frame(width: 700, height: 480)
     .background(Color(nsColor: .controlBackgroundColor))
