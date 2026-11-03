@@ -28,6 +28,14 @@ struct CodeViewerApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unified(showsTitle: false))
         .windowStyle(.hiddenTitleBar)
+        .commands {
+            CommandGroup(after: .sidebar) {
+                Button(l10nString("Toggle Sidebar")) {
+                    NotificationCenter.default.post(name: .toggleSidebar, object: nil)
+                }
+                .keyboardShortcut("s", modifiers: [.control, .command])
+            }
+        }
 
         // A standard Settings scene: singleton, fixed to its content size,
         // centered, and opened from the app menu (⌘,). It is not restored at

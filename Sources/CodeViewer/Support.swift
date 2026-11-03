@@ -22,6 +22,12 @@ extension URL {
     }
 }
 
+public extension Notification.Name {
+    /// Posted by the View menu's Toggle Sidebar command; the main window owns
+    /// the split view's column visibility.
+    static let toggleSidebar = Notification.Name("\(AppInfo.bundleID).toggleSidebar")
+}
+
 /// SF Symbol per file type, shared by the tree and the tab strip.
 enum FileIcon {
     static func symbolName(for url: URL, isDirectory: Bool) -> String {

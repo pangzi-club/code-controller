@@ -7,7 +7,7 @@ public struct ContentView: View {
     @State private var selectedWorkspaceID: Workspace.ID?
     @State private var session: WorkspaceSession?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var toolbarStripHeight: CGFloat = 52
+    @State private var chromeStripHeight: CGFloat = 28
     @State private var isFullScreen = false
     @State private var isChoosingWorkspace = false
 
@@ -19,57 +19,36 @@ public struct ContentView: View {
                 store: workspaces,
                 selection: $selectedWorkspaceID,
                 session: session,
-                topPadding: isFullScreen ? 8 : toolbarStripHeight + 8,
+                topPadding: isFullScreen ? 8 : max(chromeStripHeight, 28) + 8,
                 onSelect: select,
                 onAdd: presentWorkspacePicker,
                 onRemove: removeWorkspace,
                 onDropURL: addWorkspace
             )
+            // Removes the system sidebar toggle; its toolbar row would add a
+            // 52pt strip above the content we no longer have room for.
             .toolbar(removing: .sidebarToggle)
             .navigationSplitViewColumnWidth(min: 220, ideal: 280)
         } detail: {
             detail
-                .overlay(alignment: .top) {
-                    if !isFullScreen {
-                        pageColor
-                            .frame(height: toolbarStripHeight)
-                            .frame(maxHeight: .infinity, alignment: .top)
-                            .ignoresSafeArea(.container, edges: .top)
-                            .allowsHitTesting(false)
-                    }
-                }
         }
         .navigationSplitViewStyle(.balanced)
         .background(pageColor)
-        .toolbarBackground(.hidden, for: .windowToolbar)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: toggleSidebar) {
-                    Label {
-                        l10n("Toggle Sidebar")
-                    } icon: {
-                        Image(systemName: "sidebar.leading")
-                    }
-                }
-                .labelStyle(.iconOnly)
-                .help(l10n("Toggle Sidebar"))
-                .focusEffectDisabled()
-                // Toolbar adds 5pt; this puts the visible glyph on the list card's 20pt inset.
-                .padding(.leading, 8)
-            }
-        }
         .background(
             GeometryReader { geometry in
                 Color.clear
                     .onAppear {
-                        updateToolbarStrip(geometry.safeAreaInsets.top)
+                        updateChromeStrip(geometry.safeAreaInsets.top)
                     }
                     .onChange(of: geometry.safeAreaInsets.top) { _, height in
-                        updateToolbarStrip(height)
+                        updateChromeStrip(height)
                     }
             }
         )
         .background(WindowChrome(isFullScreen: $isFullScreen))
+        .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
+            toggleSidebar()
+        }
         .onAppear(perform: selectInitialWorkspaceIfNeeded)
         .fileImporter(
             isPresented: $isChoosingWorkspace,
@@ -91,12 +70,11 @@ public struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         if let workspace = selectedWorkspace, let session {
-            WorkspaceDetailView(workspace: workspace, session: session) {
-                Task {
-                    await session.tree.reload()
-                    session.reloadSelectedDocument()
-                }
-            }
+            WorkspaceDetailView(
+                workspace: workspace,
+                session: session,
+                sidebarLeadingInset: columnVisibility == .detailOnly ? 78 : 0
+            )
         } else {
             PlaceholderView(addWorkspace: presentWorkspacePicker)
         }
@@ -146,13 +124,12 @@ public struct ContentView: View {
         }
     }
 
-    /// Keeps the page-colored strip above the detail column in sync with the
-    /// transparent toolbar.
-    private func updateToolbarStrip(_ height: CGFloat) {
-        // Retain the last windowed height while full screen removes the safe
-        // area, so the strip is ready in the same frame as the toolbar returns.
-        guard height > 0.5, abs(height - toolbarStripHeight) > 0.5 else { return }
-        toolbarStripHeight = height
+    /// The window has no toolbar, so the top safe area is just the traffic-light
+    /// strip. It can report 0 while full screen, so the sidebar falls back to
+    /// the 28pt titlebar height instead of collapsing onto the buttons.
+    private func updateChromeStrip(_ height: CGFloat) {
+        guard height > 0.5, abs(height - chromeStripHeight) > 0.5 else { return }
+        chromeStripHeight = height
     }
 }
 
@@ -161,7 +138,9 @@ public struct ContentView: View {
 private struct WorkspaceDetailView: View {
     let workspace: Workspace
     let session: WorkspaceSession
-    let onRefresh: () -> Void
+    /// Room for the traffic lights when the sidebar is collapsed and the
+    /// content starts at the window's leading edge.
+    let sidebarLeadingInset: CGFloat
 
     private var title: String {
         session.selectedTab?.name ?? workspace.name
@@ -169,14 +148,7 @@ private struct WorkspaceDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !session.tabs.isEmpty {
-                DocumentTabBar(
-                    tabs: session.tabs,
-                    selectedTabID: session.selectedTabID,
-                    onSelect: { session.select($0) },
-                    onClose: { session.close($0) }
-                )
-            }
+            topBar
 
             ZStack {
                 codePane
@@ -187,42 +159,33 @@ private struct WorkspaceDetailView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(nsColor: .controlBackgroundColor))
+        .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(title)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
-            }
-            // hiddenTitleBar leaves no trailing flexible region; without this
-            // the primary actions pack next to the title.
-            ToolbarItem {
-                Spacer()
-            }
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    FileOpener.reveal(session.selectedURL ?? workspace.url)
-                } label: {
-                    Label {
-                        l10n("Show in Finder")
-                    } icon: {
-                        Image(systemName: "arrow.up.forward.app")
-                            .frame(width: 16, height: 16)
-                    }
+    }
+
+    /// The window has no toolbar: tabs and actions live in one strip at the
+    /// very top of the content, level with the traffic lights.
+    private var topBar: some View {
+        HStack(alignment: .top, spacing: 0) {
+            Group {
+                if session.tabs.isEmpty {
+                    Spacer(minLength: 0)
+                } else {
+                    DocumentTabBar(
+                        tabs: session.tabs,
+                        selectedTabID: session.selectedTabID,
+                        onSelect: { session.select($0) },
+                        onClose: { session.close($0) }
+                    )
                 }
-                .help(l10nString("Show in Finder"))
-                Button(action: onRefresh) {
-                    Label {
-                        l10n("Refresh")
-                    } icon: {
-                        Image(systemName: "arrow.clockwise")
-                            .frame(width: 16, height: 16)
-                    }
-                }
-                .help(l10nString("Refresh"))
-                // Toolbar adds 8pt; match the visible glyph to the card's 20pt inset.
-                .padding(.trailing, 7)
             }
+            // Collapsed sidebar: keep the tabs clear of the traffic lights,
+            // which move over the detail column.
+            .padding(.leading, sidebarLeadingInset)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(alignment: .bottom) {
+            Divider()
         }
     }
 
