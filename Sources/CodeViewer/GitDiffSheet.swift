@@ -145,10 +145,11 @@ struct GitDiffSheet: View {
             language: "diff",
             theme: theme
         ) {
-            // User-picked themes render on their own background; the
-            // appearance-following defaults keep the system one.
-            let background = theme.usesThemeBackground ? highlighted.background : nil
-            content = .text(CodeTextFactory.styled(highlighted.attributed, font: font), background)
+            // The theme renders on its own background color.
+            content = .text(
+                CodeTextFactory.styled(highlighted.attributed, font: font),
+                highlighted.background
+            )
         } else {
             content = .text(
                 NSAttributedString(string: text, attributes: CodeTextFactory.attributes(font)),

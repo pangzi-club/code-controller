@@ -9,7 +9,9 @@ struct SettingsStoreTests {
     private func cleanUp() {
         UserDefaults.standard.removeObject(forKey: "theme")
         UserDefaults.standard.removeObject(forKey: LanguagePreference.defaultsKey)
-        UserDefaults.standard.removeObject(forKey: EditorThemeOption.defaultsKey)
+        UserDefaults.standard.removeObject(forKey: "lightTheme")
+        UserDefaults.standard.removeObject(forKey: "darkTheme")
+        UserDefaults.standard.removeObject(forKey: "editorTheme")
         UserDefaults.standard.removeObject(forKey: "editorFontName")
         UserDefaults.standard.removeObject(forKey: "editorFontSize")
     }
@@ -77,25 +79,51 @@ struct SettingsStoreTests {
         }
     }
 
-    @Test("editor theme falls back to automatic when nothing (or garbage) is stored")
-    func editorThemeFallback() {
+    @Test("light and dark themes default to the stock appearance pair; garbage falls back")
+    func lightDarkThemeFallback() {
         cleanUp()
-        #expect(SettingsStore().editorTheme == .automatic)
+        let fresh = SettingsStore()
+        #expect(fresh.lightTheme == .xcode)
+        #expect(fresh.darkTheme == .xcodeDusk)
 
-        UserDefaults.standard.set("solarized", forKey: EditorThemeOption.defaultsKey)
+        UserDefaults.standard.set("klingon", forKey: "lightTheme")
+        UserDefaults.standard.set("solarized", forKey: "darkTheme")
         defer { cleanUp() }
-        #expect(SettingsStore().editorTheme == .automatic)
+        let fallback = SettingsStore()
+        #expect(fallback.lightTheme == .xcode)
+        #expect(fallback.darkTheme == .xcodeDusk)
     }
 
-    @Test("setting an editor theme persists it for the next launch")
-    func editorThemePersists() {
+    @Test("setting the light and dark themes persists them for the next launch")
+    func lightDarkThemePersists() {
         cleanUp()
         defer { cleanUp() }
 
-        SettingsStore().editorTheme = .dracula
+        let store = SettingsStore()
+        store.lightTheme = .solarizedLight
+        store.darkTheme = .nord
 
-        #expect(UserDefaults.standard.string(forKey: EditorThemeOption.defaultsKey) == "dracula")
-        #expect(SettingsStore().editorTheme == .dracula)
+        #expect(UserDefaults.standard.string(forKey: "lightTheme") == "solarized-light")
+        #expect(UserDefaults.standard.string(forKey: "darkTheme") == "nord")
+        let relaunched = SettingsStore()
+        #expect(relaunched.lightTheme == .solarizedLight)
+        #expect(relaunched.darkTheme == .nord)
+    }
+
+    @Test("a stored single editor theme seeds both slots once")
+    func legacySingleThemeSeedsBothSlots() {
+        cleanUp()
+        UserDefaults.standard.set("dracula", forKey: "editorTheme")
+        defer { cleanUp() }
+
+        let migrated = SettingsStore()
+        #expect(migrated.lightTheme == .dracula)
+        #expect(migrated.darkTheme == .dracula)
+
+        // Once the split keys exist, the legacy key no longer wins.
+        migrated.lightTheme = .nord
+        #expect(SettingsStore().lightTheme == .nord)
+        #expect(SettingsStore().darkTheme == .dracula)
     }
 
     @Test("every editor theme round-trips through its raw value")
@@ -105,7 +133,7 @@ struct SettingsStoreTests {
         }
     }
 
-    @Test("automatic resolves per appearance; a picked theme ignores it")
+    @Test("each interface appearance resolves to its own editor theme")
     func resolvedHighlightTheme() {
         cleanUp()
         defer { cleanUp() }
@@ -113,15 +141,11 @@ struct SettingsStoreTests {
         let store = SettingsStore()
         #expect(store.resolvedHighlightTheme(for: .light) == HighlightTheme.light)
         #expect(store.resolvedHighlightTheme(for: .dark) == HighlightTheme.dark)
-        // The appearance-following pair keeps the stock system background.
-        #expect(HighlightTheme.light.usesThemeBackground == false)
-        #expect(HighlightTheme.dark.usesThemeBackground == false)
 
-        store.editorTheme = .dracula
-        #expect(store.resolvedHighlightTheme(for: .light) == HighlightTheme(name: "dracula"))
-        #expect(store.resolvedHighlightTheme(for: .dark) == HighlightTheme(name: "dracula"))
-        // User-picked themes render on their own background.
-        #expect(store.resolvedHighlightTheme(for: .dark).usesThemeBackground == true)
+        store.lightTheme = .solarizedLight
+        store.darkTheme = .nord
+        #expect(store.resolvedHighlightTheme(for: .light) == HighlightTheme(name: "solarized-light"))
+        #expect(store.resolvedHighlightTheme(for: .dark) == HighlightTheme(name: "nord"))
     }
 
     @Test("editor font settings resolve into an EditorFont with a clamped size")

@@ -25,12 +25,11 @@ public enum ThemePreference: String, CaseIterable {
     }
 }
 
-/// User-selectable code-highlighting theme: "Automatic" follows the interface
-/// appearance (the stock behavior); the rest name a bundled HighlighterSwift
-/// CSS theme directly. Raw values must match a `.css` file bundled with
-/// HighlighterSwift.
+/// User-selectable code-highlighting theme. Raw values must match a `.css`
+/// file bundled with HighlighterSwift. The editor keeps one theme per
+/// interface appearance (`SettingsStore.lightTheme` / `darkTheme`), so the
+/// defaults below reproduce the stock appearance-following pair.
 public enum EditorThemeOption: String, CaseIterable {
-    case automatic = ""
     case xcode
     case xcodeDusk = "xcode-dusk"
     case github
@@ -45,13 +44,10 @@ public enum EditorThemeOption: String, CaseIterable {
     case tokyoNight = "tokyo-night-dark"
     case vsDark = "vs-dark"
 
-    static let defaultsKey = "editorTheme"
-
     /// Localization key for the picker item. Theme names are proper nouns and
     /// keep their spelling in both catalogs.
     var labelKey: String {
         switch self {
-        case .automatic: "Automatic"
         case .xcode: "Xcode"
         case .xcodeDusk: "Xcode Dusk"
         case .github: "GitHub"
@@ -97,8 +93,14 @@ public final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey) }
     }
 
-    @Published public var editorTheme: EditorThemeOption {
-        didSet { UserDefaults.standard.set(editorTheme.rawValue, forKey: EditorThemeOption.defaultsKey) }
+    /// The highlighting theme used while the interface is in light mode.
+    @Published public var lightTheme: EditorThemeOption {
+        didSet { UserDefaults.standard.set(lightTheme.rawValue, forKey: Self.lightThemeKey) }
+    }
+
+    /// The highlighting theme used while the interface is in dark mode.
+    @Published public var darkTheme: EditorThemeOption {
+        didSet { UserDefaults.standard.set(darkTheme.rawValue, forKey: Self.darkThemeKey) }
     }
 
     /// Editor font family; an empty string means the system monospaced font.
@@ -115,6 +117,10 @@ public final class SettingsStore: ObservableObject {
     }
 
     private static let themeKey = "theme"
+    private static let lightThemeKey = "lightTheme"
+    private static let darkThemeKey = "darkTheme"
+    /// Pre-split single editor theme; read once to seed both slots.
+    private static let legacyThemeKey = "editorTheme"
     private static let editorFontNameKey = "editorFontName"
     private static let editorFontSizeKey = "editorFontSize"
 
@@ -123,22 +129,26 @@ public final class SettingsStore: ObservableObject {
         EditorFont(fontName: editorFontName.isEmpty ? nil : editorFontName, size: editorFontSize)
     }
 
-    /// The highlighting theme to render with: user-picked themes render with
-    /// their own name and adopt the theme's background color; "Automatic"
-    /// mirrors the interface appearance and keeps the stock control
-    /// background.
+    /// The highlighting theme for the interface appearance currently in
+    /// effect. Themes always render on their own background color.
     func resolvedHighlightTheme(for colorScheme: ColorScheme) -> HighlightTheme {
-        switch editorTheme {
-        case .automatic: HighlightTheme(colorScheme: colorScheme)
-        case let option: HighlightTheme(name: option.rawValue)
-        }
+        HighlightTheme(name: colorScheme == .dark ? darkTheme.rawValue : lightTheme.rawValue)
     }
 
     public init() {
         theme = UserDefaults.standard.string(forKey: Self.themeKey)
             .flatMap(ThemePreference.init(rawValue:)) ?? .system
-        editorTheme = UserDefaults.standard.string(forKey: EditorThemeOption.defaultsKey)
-            .flatMap(EditorThemeOption.init(rawValue:)) ?? .automatic
+        // A previously stored single editor theme ("always this theme")
+        // seeds both slots; each slot defaults to the stock appearance
+        // pair (Xcode in light, Xcode Dusk in dark).
+        let legacyTheme = UserDefaults.standard.string(forKey: Self.legacyThemeKey)
+            .flatMap(EditorThemeOption.init(rawValue:))
+        lightTheme = UserDefaults.standard.string(forKey: Self.lightThemeKey)
+            .flatMap(EditorThemeOption.init(rawValue:))
+            ?? legacyTheme ?? .xcode
+        darkTheme = UserDefaults.standard.string(forKey: Self.darkThemeKey)
+            .flatMap(EditorThemeOption.init(rawValue:))
+            ?? legacyTheme ?? .xcodeDusk
         editorFontName = UserDefaults.standard.string(forKey: Self.editorFontNameKey) ?? ""
         // A missing size is 13; a stored one clamps into the offered range so
         // the stepper and the effective font never disagree after a relaunch.

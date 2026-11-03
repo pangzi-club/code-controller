@@ -43,8 +43,8 @@
 "Appearance" = "外观";
 "Editor" = "编辑器";
 "Shortcuts" = "快捷键";
-"Automatic" = "自动";
-"Editor Theme" = "编辑器主题";
+"Light Theme" = "浅色主题";
+"Dark Theme" = "深色主题";
 "Font" = "字体";
 "Font Size" = "字号";
 "System Mono" = "系统等宽";

@@ -163,13 +163,12 @@ struct CodePane: NSViewRepresentable {
             let documentID = entry.documentID
             let cacheKey = "\(tabID)#\(documentID)"
 
-            // The pane adopts the theme's own background only for user-picked
-            // themes; the appearance-following defaults keep the system one.
+            // The pane adopts the theme's own background color.
             let cached = cache.result(for: cacheKey, theme: theme, fontID: font.id)
 
             if let cached {
                 editorView.applyFont(font)
-                editorView.setBackground(theme.usesThemeBackground ? cached.background : nil)
+                editorView.setBackground(cached.background)
                 editorView.setAttributedText(cached.attributed)
                 return
             }
@@ -192,7 +191,7 @@ struct CodePane: NSViewRepresentable {
                         theme: theme
                     )
                     let styled = CodeTextFactory.styled(raw.attributed, font: font)
-                    let background = theme.usesThemeBackground ? raw.background : nil
+                    let background = raw.background
                     guard !Task.isCancelled,
                           let current = self.entries[tabID],
                           current.editorView === editorView,

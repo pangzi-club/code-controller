@@ -194,12 +194,12 @@ instead of a developer's home path.
   styled` must re-pin font and paragraph style over any highlighter output
   (colors may be themed, metrics may not — the ruler contract above).
   Finished results cache per document version + theme + editor font in
-  `HighlightCache`; the automatic appearance-following themes keep the system
-  control background, while a user-picked editor theme adopts its own
-  background (`HighlightTheme.usesThemeBackground`). `DocumentStore.
-  reloadIfChanged` (mtime + size) is what keeps watcher bursts from
-  invalidating that cache, so do not replace plain `reload()` with it on the
-  watcher path.
+  `HighlightCache`; every editor theme renders on its own background color
+  (parsed from the theme CSS), and `SettingsStore` keeps one theme per
+  interface appearance (`lightTheme` / `darkTheme`, resolved by
+  `resolvedHighlightTheme(for:)`). `DocumentStore.reloadIfChanged`
+  (mtime + size) is what keeps watcher bursts from invalidating that cache,
+  so do not replace plain `reload()` with it on the watcher path.
 - `git log --pretty=format:` interleaves a bare newline **between** records
   (separator semantics, unlike `tformat:`), so every parsed commit record
   after the first starts with `\n`; strip it or the hash is polluted and

@@ -2,28 +2,18 @@ import Foundation
 import Highlighter
 import SwiftUI
 
-/// Which highlight.js color set to render with. Either one of the two
-/// appearance-following defaults or a user-picked bundled HighlighterSwift
-/// theme by name — names must match a `.css` file bundled with
-/// HighlighterSwift.
+/// Which highlight.js color set to render with: a bundled HighlighterSwift
+/// theme by name — names must match a `.css` file in the dependency bundle.
+/// The editor resolves one per interface appearance (see `SettingsStore`).
 public struct HighlightTheme: Equatable, Sendable {
     public let name: String
-    /// Whether the code pane should adopt the theme's own background color:
-    /// user-picked themes do (their palettes assume it), the
-    /// appearance-following defaults keep the stock system background.
-    public let usesThemeBackground: Bool
 
-    public init(name: String, usesThemeBackground: Bool = true) {
+    public init(name: String) {
         self.name = name
-        self.usesThemeBackground = usesThemeBackground
     }
 
-    public static let light = HighlightTheme(name: "xcode", usesThemeBackground: false)
-    public static let dark = HighlightTheme(name: "xcode-dusk", usesThemeBackground: false)
-
-    public init(colorScheme: ColorScheme) {
-        self = colorScheme == .dark ? .dark : .light
-    }
+    public static let light = HighlightTheme(name: "xcode")
+    public static let dark = HighlightTheme(name: "xcode-dusk")
 }
 
 public enum HighlightError: Error, LocalizedError {

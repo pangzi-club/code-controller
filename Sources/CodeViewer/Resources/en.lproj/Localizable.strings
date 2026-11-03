@@ -43,8 +43,8 @@
 "Appearance" = "Appearance";
 "Editor" = "Editor";
 "Shortcuts" = "Shortcuts";
-"Automatic" = "Automatic";
-"Editor Theme" = "Editor Theme";
+"Light Theme" = "Light Theme";
+"Dark Theme" = "Dark Theme";
 "Font" = "Font";
 "Font Size" = "Font Size";
 "System Mono" = "System Mono";

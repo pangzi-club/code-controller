@@ -167,6 +167,26 @@ private struct EditorPane: View {
         Double(EditorFont.sizeRange.lowerBound)...Double(EditorFont.sizeRange.upperBound)
     }
 
+    /// One bundled theme per interface appearance, with a live preview below
+    /// showing whichever the current appearance resolves to.
+    private func themePickerRow(
+        _ labelKey: String,
+        selection: Binding<EditorThemeOption>
+    ) -> some View {
+        SettingsRow(labelKey) {
+            Picker(selection: selection) {
+                ForEach(EditorThemeOption.allCases, id: \.self) { option in
+                    l10n(option.labelKey).tag(option)
+                }
+            } label: {
+                l10n(labelKey)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(width: 180)
+        }
+    }
+
     static let previewCode = """
         import SwiftUI
 
@@ -186,18 +206,8 @@ private struct EditorPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 12) {
-                SettingsRow("Editor Theme") {
-                    Picker(selection: $settings.editorTheme) {
-                        ForEach(EditorThemeOption.allCases, id: \.self) { option in
-                            l10n(option.labelKey).tag(option)
-                        }
-                    } label: {
-                        l10n("Editor Theme")
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .frame(width: 180)
-                }
+                themePickerRow("Light Theme", selection: $settings.lightTheme)
+                themePickerRow("Dark Theme", selection: $settings.darkTheme)
 
                 SettingsRow("Font") {
                     Picker(selection: $settings.editorFontName) {
