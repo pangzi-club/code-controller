@@ -25,6 +25,9 @@ final class DocumentStore {
     private let instanceID = UUID()
     private let service: FileService
 
+    /// Read-time metadata for `reloadIfChanged`; nil until a text read lands.
+    @ObservationIgnored private var lastReadModificationDate: Date?
+    @ObservationIgnored private var lastReadByteSize: Int?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
 
     init(service: FileService = .shared) {
@@ -41,6 +44,22 @@ final class DocumentStore {
 
     func reload() {
         guard let url else { return }
+        load(from: url)
+    }
+
+    /// Reloads only when the file actually changed on disk (mtime or size),
+    /// so a watcher burst touching unrelated files does not invalidate every
+    /// open tab's highlight cache.
+    func reloadIfChanged() {
+        guard let url, case .text = state else { return }
+        let values = try? url.resourceValues(
+            forKeys: [.contentModificationDateKey, .fileSizeKey]
+        )
+        let modificationDate = values?.contentModificationDate
+        let byteSize = values?.fileSize
+        if modificationDate == lastReadModificationDate, byteSize == lastReadByteSize {
+            return
+        }
         load(from: url)
     }
 
@@ -63,7 +82,10 @@ final class DocumentStore {
             guard !Task.isCancelled, self.revision == revision else { return }
 
             switch content {
-            case .text(let document): self.state = .text(document)
+            case .text(let document):
+                self.lastReadModificationDate = document.modificationDate
+                self.lastReadByteSize = document.byteSize
+                self.state = .text(document)
             case .binary: self.state = .binary
             case .tooLarge(let byteSize): self.state = .tooLarge(byteSize: byteSize)
             case nil: self.state = .failed

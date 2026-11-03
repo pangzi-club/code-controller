@@ -8,6 +8,9 @@ struct TextDocument: Sendable, Equatable {
     let text: String
     let encoding: String.Encoding
     let byteSize: Int
+    /// Modification time at read; the store compares it on watcher events
+    /// to decide whether a reload is worth doing.
+    let modificationDate: Date?
 }
 
 enum DocumentContent: Sendable, Equatable {
@@ -115,7 +118,9 @@ actor FileService {
     }
 
     func readDocument(at url: URL) throws -> DocumentContent {
-        let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        let values = try url.resourceValues(
+            forKeys: [.fileSizeKey, .isRegularFileKey, .contentModificationDateKey]
+        )
         guard values.isRegularFile == true else { throw FileServiceError.notAFile }
 
         let size = Int64(values.fileSize ?? 0)
@@ -126,7 +131,8 @@ actor FileService {
         return .text(TextDocument(
             text: decoded.text,
             encoding: decoded.encoding,
-            byteSize: data.count
+            byteSize: data.count,
+            modificationDate: values.contentModificationDate
         ))
     }
 }

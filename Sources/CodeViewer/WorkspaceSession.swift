@@ -20,6 +20,7 @@ final class WorkspaceSession {
     private let service: FileService
 
     @ObservationIgnored private var hasLoadedTree = false
+    @ObservationIgnored private var watcher: WorkspaceWatcher?
 
     init(workspace: Workspace, service: FileService = .shared) {
         self.workspace = workspace
@@ -42,6 +43,7 @@ final class WorkspaceSession {
         hasLoadedTree = true
         await tree.loadRoot()
         await git.refresh(workspaceURL: workspace.url)
+        startWatching()
     }
 
     /// Manual refresh: the tree, git statuses and the selected document.
@@ -49,6 +51,26 @@ final class WorkspaceSession {
         await tree.reload()
         await git.refresh(workspaceURL: workspace.url)
         reloadSelectedDocument()
+    }
+
+    /// A debounced burst of file events under the workspace: the tree, git
+    /// statuses and any changed open document refresh together.
+    private func handleWorkspaceChange() {
+        Task {
+            await tree.reload()
+            await git.refresh(workspaceURL: workspace.url)
+            tabs.forEach { $0.document.reloadIfChanged() }
+        }
+    }
+
+    private func startWatching() {
+        guard watcher == nil else { return }
+        let watcher = WorkspaceWatcher(root: workspace.url) { [weak self] in
+            self?.handleWorkspaceChange()
+        }
+        watcher.start()
+        self.watcher = watcher
+        Log.files.notice("Watching \(workspace.url.path) for changes")
     }
 
     func open(_ node: FileNode) {
