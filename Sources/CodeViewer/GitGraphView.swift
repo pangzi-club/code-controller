@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Sidebar pane listing the workspace's recent commits in a single-lane
 /// graph: dot rail, subject, author and relative time, with the branch name
-/// badge on refs. Clicking a commit opens its full diff in the sheet.
+/// badge on refs. Clicking a commit opens its merged diff in a tab.
 struct GitGraphView: View {
     let git: GitStatusStore
     let onSelect: (GitCommit) -> Void

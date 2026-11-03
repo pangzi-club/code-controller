@@ -6,7 +6,6 @@ struct FileTreeView: View {
     let selectedURL: URL?
     let git: GitStatusStore
     let onOpen: (FileNode) -> Void
-    let onShowDiff: (URL) -> Void
 
     var body: some View {
         Group {
@@ -30,8 +29,7 @@ struct FileTreeView: View {
                                 tree: tree,
                                 selectedURL: selectedURL,
                                 git: git,
-                                onOpen: onOpen,
-                                onShowDiff: onShowDiff
+                                onOpen: onOpen
                             )
                         }
                     }
@@ -64,7 +62,6 @@ private struct FileTreeRowView: View {
     let selectedURL: URL?
     let git: GitStatusStore
     let onOpen: (FileNode) -> Void
-    let onShowDiff: (URL) -> Void
 
     @State private var isHovered = false
 
@@ -122,13 +119,6 @@ private struct FileTreeRowView: View {
                     FileOpener.open(row.node.url)
                 } label: {
                     l10n("Open")
-                }
-            }
-            if git.canShowDiff(for: row.node.url) {
-                Button {
-                    onShowDiff(row.node.url)
-                } label: {
-                    l10n("Show Git Diff")
                 }
             }
             Button {
@@ -189,8 +179,7 @@ private struct FileTreePreview: View {
             tree: session.tree,
             selectedURL: session.selectedURL,
             git: session.git,
-            onOpen: { session.open($0) },
-            onShowDiff: { _ in }
+            onOpen: { session.open($0) }
         )
         .frame(width: 260, height: 420)
         .background(Color(nsColor: .windowBackgroundColor))

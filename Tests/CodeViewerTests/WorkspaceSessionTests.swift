@@ -26,6 +26,15 @@ struct WorkspaceSessionTests {
         return FileNode(url: url, isDirectory: false)
     }
 
+    private func documentStore(_ tab: DocumentTab) -> DocumentStore? {
+        guard case .file(_, let store) = tab.content else { return nil }
+        return store
+    }
+
+    private func commit(_ hash: String) -> GitCommit {
+        GitCommit(hash: hash, subject: "commit \(hash)", authorName: "tester", date: nil, refName: nil)
+    }
+
     /// The document load lands on the main actor asynchronously; suspend so
     /// it can run instead of racing it.
     private func waitUntil(_ condition: () -> Bool) async throws {
@@ -60,9 +69,9 @@ struct WorkspaceSessionTests {
         session.open(first)
         session.open(second)
 
-        #expect(session.tabs.map(\.url) == [first.url, second.url])
+        #expect(session.tabs.compactMap(\.url) == [first.url, second.url])
         #expect(session.selectedTab?.url == second.url)
-        #expect(session.tabs[0].document !== session.tabs[1].document)
+        #expect(documentStore(session.tabs[0]) !== documentStore(session.tabs[1]))
     }
 
     @Test("closing the selected tab selects its neighbor")
@@ -78,7 +87,7 @@ struct WorkspaceSessionTests {
         session.select(session.tabs[0])
         session.close(session.tabs[0])
 
-        #expect(session.tabs.map(\.url) == [second.url])
+        #expect(session.tabs.compactMap(\.url) == [second.url])
         #expect(session.selectedTab?.url == second.url)
 
         session.close(session.tabs[0])
@@ -95,12 +104,12 @@ struct WorkspaceSessionTests {
         let file = try makeNode("App.swift", in: root)
 
         session.open(file)
-        let firstStore = session.tabs[0].document
+        let firstStore = documentStore(session.tabs[0])
         session.close(session.tabs[0])
         session.open(file)
 
         #expect(session.tabs.count == 1)
-        #expect(session.tabs[0].document !== firstStore)
+        #expect(documentStore(session.tabs[0]) !== firstStore)
     }
 
     @Test("image files open into an image state")
@@ -116,10 +125,10 @@ struct WorkspaceSessionTests {
             return
         }
         try await waitUntil {
-            if case .image = tab.document.state { return true } else { return false }
+            if case .image = documentStore(tab)?.state { return true } else { return false }
         }
 
-        guard case .image(let document) = tab.document.state else {
+        guard case .image(let document) = documentStore(tab)?.state else {
             Issue.record("expected image state")
             return
         }
@@ -134,23 +143,76 @@ struct WorkspaceSessionTests {
         let file = try makeImageNode("logo.png", in: root)
 
         session.open(file)
-        guard let tab = session.selectedTab else {
-            Issue.record("expected a selected tab")
+        guard let tab = session.selectedTab, let store = documentStore(tab) else {
+            Issue.record("expected a selected file tab")
             return
         }
         try await waitUntil {
-            if case .image = tab.document.state { return true } else { return false }
+            if case .image = store.state { return true } else { return false }
         }
-        let revisionAfterOpen = tab.document.revision
+        let revisionAfterOpen = store.revision
 
         // Append one byte so the size check in `reloadIfChanged` always trips,
         // regardless of mtime precision.
         _ = try makeImageNode("logo.png", in: root, appending: [Data([0x00])])
-        tab.document.reloadIfChanged()
+        store.reloadIfChanged()
 
-        #expect(tab.document.revision == revisionAfterOpen + 1)
+        #expect(store.revision == revisionAfterOpen + 1)
         try await waitUntil {
-            if case .image = tab.document.state { return true } else { return false }
+            if case .image = store.state { return true } else { return false }
         }
+    }
+
+    // MARK: Commit diff tabs
+
+    @Test("opening a commit diff creates one namespaced tab and selects it")
+    func opensCommitDiffTab() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+
+        session.openDiff(commit: commit("abc123"))
+
+        #expect(session.tabs.count == 1)
+        #expect(session.selectedTab?.id == "diff:commit:abc123")
+        #expect(session.selectedTab?.name == "commit abc123")
+        guard case .commitDiff(let document) = session.selectedTab?.content else {
+            Issue.record("expected a commit diff tab")
+            return
+        }
+        #expect(document.commit.hash == "abc123")
+    }
+
+    @Test("opening the same commit focuses the existing tab; other commits append")
+    func dedupesCommitDiffTabs() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+
+        session.openDiff(commit: commit("abc123"))
+        session.openDiff(commit: commit("abc123"))
+
+        #expect(session.tabs.count == 1)
+        #expect(session.selectedTab?.id == "diff:commit:abc123")
+
+        session.openDiff(commit: commit("def456"))
+
+        #expect(session.tabs.count == 2)
+        #expect(session.selectedTab?.id == "diff:commit:def456")
+    }
+
+    @Test("a commit diff tab can be closed like a file tab")
+    func closesCommitDiffTab() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+        let file = try makeNode("A.swift", in: root)
+
+        session.open(file)
+        session.openDiff(commit: commit("abc123"))
+        session.close(session.selectedTab!)
+
+        #expect(session.tabs.count == 1)
+        #expect(session.selectedTab?.id == "file:" + file.url.path)
     }
 }

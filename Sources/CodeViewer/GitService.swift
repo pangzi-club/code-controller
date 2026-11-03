@@ -83,18 +83,6 @@ actor GitService {
         return Self.parseStatus(output, root: root)
     }
 
-    /// Unified diff of one file against HEAD (staged and unstaged combined),
-    /// or nil when the diff cannot be produced. A repository without commits
-    /// falls back to the unstaged-only diff.
-    func diff(for url: URL, root: URL) async -> String? {
-        guard let git = resolveGit() else { return nil }
-        let headArguments = ["-C", root.path, "diff", "HEAD", "--no-color", "--", url.path]
-        if let output = run(git, arguments: headArguments) {
-            return output
-        }
-        return run(git, arguments: ["-C", root.path, "diff", "--no-color", "--", url.path])
-    }
-
     /// Recent commit history, newest first. Fields arrive separated by unit
     /// separators and commits by record separators, so no quoting or escaping
     /// can corrupt the parse.
@@ -149,12 +137,15 @@ actor GitService {
         return first
     }
 
-    /// The full diff of one commit (`git show`, diff body only).
+    /// The full diff of one commit (`git show`, diff body only). Five lines
+    /// of context per hunk — the inline view's "N hidden lines" bands adapt
+    /// to whatever the headers say.
     func commitDiff(root: URL, hash: String) async -> String? {
         guard let git = resolveGit() else { return nil }
         return run(git, arguments: [
             "-C", root.path,
             "show", "--no-color", "--no-ext-diff",
+            "--unified=5",
             "--pretty=format:",
             hash,
         ])
@@ -265,13 +256,6 @@ final class GitStatusStore {
 
     func status(for url: URL) -> GitFileStatus? {
         statuses[url.standardizedFileURL]
-    }
-
-    /// Diffs are meaningful for tracked changes; untracked files have nothing
-    /// to diff against.
-    func canShowDiff(for url: URL) -> Bool {
-        guard hasRepository, let status = status(for: url) else { return false }
-        return status != .untracked
     }
 
     /// Discovers the repository and loads statuses. A newer call supersedes

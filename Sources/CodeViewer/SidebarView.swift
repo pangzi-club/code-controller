@@ -16,7 +16,6 @@ struct SidebarView: View {
     let onAdd: () -> Void
     let onRemove: (Workspace) -> Void
     let onDropURL: (URL) -> Void
-    let onShowDiff: (URL) -> Void
 
     @State private var pane: Pane = .files
     @State private var dropTargeted = false
@@ -48,18 +47,12 @@ struct SidebarView: View {
                             tree: session.tree,
                             selectedURL: session.selectedURL,
                             git: session.git,
-                            onOpen: { session.open($0) },
-                            onShowDiff: onShowDiff
+                            onOpen: { session.open($0) }
                         )
                     case .graph:
                         GitGraphView(
                             git: session.git,
-                            onSelect: { commit in
-                                session.requestDiff = GitDiffRequest(
-                                    commitHash: commit.hash,
-                                    subject: commit.subject
-                                )
-                            }
+                            onSelect: { session.openDiff(commit: $0) }
                         )
                     }
                 } else {

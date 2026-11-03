@@ -24,8 +24,7 @@ public struct ContentView: View {
                 onSelect: select,
                 onAdd: presentWorkspacePicker,
                 onRemove: removeWorkspace,
-                onDropURL: addWorkspace,
-                onShowDiff: { session?.requestDiff = GitDiffRequest(url: $0) }
+                onDropURL: addWorkspace
             )
             // Removes the system sidebar toggle; its toolbar row would add a
             // 52pt strip above the content we no longer have room for.
@@ -246,22 +245,6 @@ private struct WorkspaceDetailView: View {
         .onChange(of: workspace.id) { _, _ in
             dismissQuickOpen()
         }
-        .sheet(item: diffRequestBinding) { request in
-            GitDiffSheet(
-                request: request,
-                root: session.git.repositoryRoot,
-                colorScheme: colorScheme
-            )
-        }
-    }
-
-    /// Bridges the session's optional diff request to the sheet's Identifiable
-    /// item binding; dismissal clears it again.
-    private var diffRequestBinding: Binding<GitDiffRequest?> {
-        Binding(
-            get: { session.requestDiff },
-            set: { session.requestDiff = $0 }
-        )
     }
 
     /// Resigns the search field before the panel unmounts, so the field editor
@@ -285,8 +268,7 @@ private struct WorkspaceDetailView: View {
                         selectedTabID: session.selectedTabID,
                         git: session.git,
                         onSelect: { session.select($0) },
-                        onClose: { session.close($0) },
-                        onShowDiff: { session.requestDiff = GitDiffRequest(url: $0.url) }
+                        onClose: { session.close($0) }
                     )
                 }
             }
@@ -317,15 +299,16 @@ private struct WorkspaceDetailView: View {
 
     private var textSelection: (tabID: String, text: String, documentID: String, language: String?)? {
         guard let tab = session.selectedTab,
-              case .text(let document) = tab.document.state,
+              case .file(let url, let store) = tab.content,
+              case .text(let document) = store.state,
               !document.text.isEmpty else {
             return nil
         }
         return (
             tab.id,
             document.text,
-            tab.document.versionID,
-            SyntaxLanguageMapper.highlightLanguage(forExtension: tab.url.pathExtension)
+            store.versionID,
+            SyntaxLanguageMapper.highlightLanguage(forExtension: url.pathExtension)
         )
     }
 
@@ -341,42 +324,52 @@ private struct WorkspaceDetailView: View {
         if session.tabs.isEmpty {
             StatusView(icon: "doc.text", message: l10n("Select a file to view"))
         } else if let tab = session.selectedTab {
-            switch tab.document.state {
-            case .empty:
-                StatusView(icon: "doc.text", message: l10n("Select a file to view"))
-            case .loading:
-                ZStack {
-                    Color(nsColor: .controlBackgroundColor)
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .text(let document):
-                if document.text.isEmpty {
-                    StatusView(icon: "doc", message: l10n("This file is empty"))
-                }
-            case .image(let document):
-                ImageContentView(document: document)
-            case .binary:
-                StatusView(
-                    icon: "doc.zipper",
-                    message: l10n("Binary file"),
-                    detail: l10n("This file can't be displayed as text.")
-                )
-            case .tooLarge(let byteSize):
-                StatusView(
-                    icon: "doc",
-                    message: l10n("File too large"),
-                    detail: l10n(
-                        "This file is %@ and too large to display.",
-                        ByteCountFormatter.string(fromByteCount: byteSize, countStyle: .file)
+            switch tab.content {
+            case .commitDiff(let document):
+                // Identity is the commit, not the view position: two diff
+                // tabs share the same structural slot, and without this their
+                // file sections collide on path ids (FileDiff.id is the bare
+                // path), reusing stale @State across documents.
+                GitDiffContentView(document: document)
+                    .id(document.commit.hash)
+            case .file(_, let store):
+                switch store.state {
+                case .empty:
+                    StatusView(icon: "doc.text", message: l10n("Select a file to view"))
+                case .loading:
+                    ZStack {
+                        Color(nsColor: .controlBackgroundColor)
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .text(let document):
+                    if document.text.isEmpty {
+                        StatusView(icon: "doc", message: l10n("This file is empty"))
+                    }
+                case .image(let document):
+                    ImageContentView(document: document)
+                case .binary:
+                    StatusView(
+                        icon: "doc.zipper",
+                        message: l10n("Binary file"),
+                        detail: l10n("This file can't be displayed as text.")
                     )
-                )
-            case .failed:
-                StatusView(
-                    icon: "exclamationmark.triangle",
-                    message: l10n("Couldn't read this file. It may have been moved or deleted.")
-                )
+                case .tooLarge(let byteSize):
+                    StatusView(
+                        icon: "doc",
+                        message: l10n("File too large"),
+                        detail: l10n(
+                            "This file is %@ and too large to display.",
+                            ByteCountFormatter.string(fromByteCount: byteSize, countStyle: .file)
+                        )
+                    )
+                case .failed:
+                    StatusView(
+                        icon: "exclamationmark.triangle",
+                        message: l10n("Couldn't read this file. It may have been moved or deleted.")
+                    )
+                }
             }
         }
     }
@@ -406,7 +399,10 @@ private struct PlaceholderView: View {
     }
 }
 
-private struct StatusView: View {
+/// Shared empty/error/loading placeholder: big thin SF Symbol, one message
+/// and an optional detail line, centered on the page background. Also used by
+/// the git diff tab's states.
+struct StatusView: View {
     let icon: String
     let message: Text
     var detail: Text?

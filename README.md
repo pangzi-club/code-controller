@@ -10,12 +10,12 @@ out of the box.
 ## Features
 
 - **Workspaces sidebar**: add folders from the workspace menu or by dragging them in; each gets a stable color tile derived from its path. The sidebar hosts a Files/Graph pane switch, uses the native translucent material, and extends under the transparent titlebar to the traffic lights.
-- **File tree**: lazily loaded recursive tree (directories first, then by name) with hover highlighting, context menus (Open, Show Git Diff, Show in Finder) and per-row git status badges.
+- **File tree**: lazily loaded recursive tree (directories first, then by name) with hover highlighting, context menus (Open, Show in Finder) and per-row git status badges.
 - **Quick open (⌘P)**: a floating search panel over the workspace. It rescans on every open, matches file names case-insensitively (falling back to relative-path matches), highlights the hit in the name, and navigates with ↑/↓ + Enter; Esc or a click outside dismisses it.
-- **Document tabs**: one tab per file with middle-truncating titles, two-row wrapping, a close button and the same git status badge. ⌘W closes the selected tab (does nothing with no tabs open, so it never takes the window down); ⌘1…⌘9 switch tabs. Views are pooled in an LRU (8 entries) so switching tabs preserves scroll position and selection. Image files (PNG, JPEG, GIF, WebP, HEIC, TIFF, BMP, SVG) open as scaled-to-fit previews — animated formats play, oversized files still hit the shared size limit, and corrupted ones fall back to the binary-file notice.
+- **Document tabs**: one tab per file with middle-truncating titles, two-row wrapping, a close button and the same git status badge. ⌘W closes the selected tab (does nothing with no tabs open, so it never takes the window down); ⌘1…⌘9 switch tabs. Views are pooled in an LRU (8 entries) so switching tabs preserves scroll position and selection. Image files (PNG, JPEG, GIF, WebP, HEIC, TIFF, BMP, SVG) open as scaled-to-fit previews — animated formats play, oversized files still hit the shared size limit, and corrupted ones fall back to the binary-file notice. A commit's merged diff opens as its own tab kind with a git-flavored icon.
 - **Syntax highlighting**: highlight.js (via HighlighterSwift) running on a background actor, with a `SyntaxHighlighter` protocol seam for future engines. Finished results cache per document version, theme and editor font (LRU, 12 entries); the styled output is re-pinned to the editor font and pinned line height so the line-number ruler never shifts; separate editor themes for light and dark appearance (13 curated highlight.js themes, each rendered on its own background).
-- **Git integration**: repository detection at the workspace root with graceful degradation when git is missing; `git status` badges (M/A/D/?) on tree rows and tabs; read-only diff sheets for files (working tree vs HEAD) and whole commits (⌘R refreshes tree, statuses, commits and the selected document).
-- **Commit history**: a Graph pane in the sidebar listing recent commits — subject, author, relative date, branch badge — click one to open its full diff.
+- **Git integration**: repository detection at the workspace root with graceful degradation when git is missing; `git status` badges (M/A/D/?) on tree rows and tabs (⌘R refreshes tree, statuses, commits and the selected document).
+- **Commit history**: a Graph pane in the sidebar listing recent commits — subject, author, relative date, branch badge — click one to open its merged diff as a tab: every changed file stacked top to bottom, each rendered as an inline diff with old/new line-number gutters, green/red row tints, static "N hidden lines" bands and per-language syntax highlighting.
 - **Live refresh**: FSEvents watch per workspace with debounced bursts; the tree, git statuses and changed open documents refresh automatically. Unchanged documents are skipped via mtime/size checks so highlight caches survive unrelated churn.
 - **Settings window**: a sidebar with four panes — General (interface language), Appearance (system/light/dark theme), Editor (light/dark highlight themes with a live preview, editor font family and size) and Shortcuts (a reference list of the fixed keyboard shortcuts) — persisted and applied app-wide; a separate fixed-size window opened with ⌘, from the App menu.
 - **Persistence**: the workspace list is stored as security-scoped bookmarks in UserDefaults (so the sandboxed App Store build keeps access across relaunches; stale folders are dropped), and the system restores the window frame across relaunches.
@@ -177,13 +177,15 @@ Sources/
 │   ├── SidebarView.swift         # Workspace menu + Files/Graph pane switch
 │   ├── FileTree.swift            # Lazily loaded tree store
 │   ├── FileTreeView.swift        # Tree rows with git badges
-│   ├── DocumentTab.swift         # Tab model (URL + per-tab DocumentStore)
+│   ├── DocumentTab.swift         # Tab model (file or commit diff, per-tab document)
 │   ├── DocumentTabBar.swift      # Wrapping tab strip with badges
 │   ├── CodePane.swift            # LRU-pooled NSTextView editors + pinned metrics
 │   ├── SyntaxHighlighting.swift  # SyntaxHighlighter protocol, HighlighterSwift adapter, cache
 │   ├── GitService.swift          # git CLI: status/diff/log + observable status store
 │   ├── GitGraphView.swift        # Commit history pane
-│   ├── GitDiffSheet.swift        # Read-only diff sheet (file or commit)
+│   ├── GitDiffDocument.swift     # Commit diff document (load state + highlight cache)
+│   ├── GitDiffContentView.swift  # Inline commit diff tab view
+│   ├── UnifiedDiff.swift         # Unified diff parser + inline row model
 │   ├── WorkspaceWatcher.swift    # FSEvents watcher with debounce
 │   ├── WorkspaceSession.swift    # Per-workspace tabs, tree, git, watcher
 │   ├── QuickOpen.swift           # ⌘P quick-open panel: recursive scan, matching, overlay UI

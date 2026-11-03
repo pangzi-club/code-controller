@@ -12,10 +12,6 @@ final class WorkspaceSession {
     let git: GitStatusStore
     private(set) var tabs: [DocumentTab] = []
     private(set) var selectedTabID: DocumentTab.ID?
-    /// Diff awaiting presentation in the read-only sheet; nil when none.
-    /// View-transient state set from the tree rows, the tab strip and the
-    /// commit history.
-    var requestDiff: GitDiffRequest?
 
     private let service: FileService
 
@@ -54,12 +50,17 @@ final class WorkspaceSession {
     }
 
     /// A debounced burst of file events under the workspace: the tree, git
-    /// statuses and any changed open document refresh together.
+    /// statuses and any changed open document refresh together. Commit-diff
+    /// tabs are immutable history and are skipped.
     private func handleWorkspaceChange() {
         Task {
             await tree.reload()
             await git.refresh(workspaceURL: workspace.url)
-            tabs.forEach { $0.document.reloadIfChanged() }
+            for tab in tabs {
+                if case .file(_, let document) = tab.content {
+                    document.reloadIfChanged()
+                }
+            }
         }
     }
 
@@ -84,8 +85,27 @@ final class WorkspaceSession {
         let tab = DocumentTab(url: node.url, service: service)
         tabs.append(tab)
         selectedTabID = tab.id
-        tab.document.open(url: node.url)
+        if case .file(_, let document) = tab.content {
+            document.open(url: node.url)
+        }
         Log.editor.notice("Open tab \(node.url.path)")
+    }
+
+    /// Opens the commit's merged diff as a tab — every changed file stacked
+    /// top to bottom. Commit content is immutable, so the tab loads once;
+    /// clicking the same commit again focuses the existing tab.
+    func openDiff(commit: GitCommit) {
+        let tab = DocumentTab(commit: commit)
+        if let existing = tabs.first(where: { $0.id == tab.id }) {
+            selectedTabID = existing.id
+            return
+        }
+        tabs.append(tab)
+        selectedTabID = tab.id
+        if case .commitDiff(let document) = tab.content {
+            document.load(root: workspace.url)
+        }
+        Log.git.notice("Open commit diff \(commit.hash)")
     }
 
     func select(_ tab: DocumentTab) {
@@ -108,7 +128,10 @@ final class WorkspaceSession {
     }
 
     func reloadSelectedDocument() {
-        selectedTab?.document.reload()
+        guard let tab = selectedTab else { return }
+        if case .file(_, let document) = tab.content {
+            document.reload()
+        }
     }
 }
 

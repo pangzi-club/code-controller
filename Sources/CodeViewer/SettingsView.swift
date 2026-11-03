@@ -264,7 +264,6 @@ private struct ShortcutsPane: View {
         ("⌃⌘S", "Toggle Sidebar"),
         ("⌘R", "Refresh Workspace"),
         ("⌘,", "Open Settings"),
-        ("esc", "Close Git Diff"),
     ]
 
     var body: some View {

@@ -175,25 +175,9 @@ struct GitStatusStoreTests {
         #expect(store.repositoryRoot == nil)
         #expect(store.statuses.isEmpty)
         #expect(!store.hasRepository)
-        #expect(!store.canShowDiff(for: outside.appending(path: "anything.txt")))
         #expect(store.status(for: outside.appending(path: "anything.txt")) == nil)
         #expect(!store.isRefreshing)
 
         try? FileManager.default.removeItem(at: outside)
-    }
-
-    @Test("diff availability tracks tracked-change statuses")
-    func diffAvailability() async throws {
-        let store = GitStatusStore()
-        await store.refresh(workspaceURL: FileManager.default.temporaryDirectory)
-
-        // No repository anywhere under the temp root in practice; if one
-        // unexpectedly exists above it, the assertions below still hold for
-        // a status-free URL.
-        guard store.hasRepository else {
-            #expect(!store.canShowDiff(for: FileManager.default.temporaryDirectory.appending(path: "x.swift")))
-            return
-        }
-        #expect(!store.canShowDiff(for: FileManager.default.temporaryDirectory.appending(path: "x.swift")))
     }
 }

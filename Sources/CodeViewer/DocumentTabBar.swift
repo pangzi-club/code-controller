@@ -9,7 +9,6 @@ struct DocumentTabBar: View {
     let git: GitStatusStore
     let onSelect: (DocumentTab) -> Void
     let onClose: (DocumentTab) -> Void
-    let onShowDiff: (DocumentTab) -> Void
 
     @State private var hoveredTabID: DocumentTab.ID?
     @State private var viewportWidth: CGFloat = 0
@@ -73,18 +72,28 @@ struct DocumentTabBar: View {
         }
     }
 
+    /// Diff tabs are a second content kind: they carry a git-flavored icon
+    /// instead of the file-type symbol, and no status badge (there is no file
+    /// whose status could be shown).
+    private func tabIcon(_ tab: DocumentTab) -> String {
+        switch tab.content {
+        case .file(let url, _): return FileIcon.symbolName(for: url, isDirectory: false)
+        case .commitDiff: return "arrow.left.arrow.right"
+        }
+    }
+
     private func tabView(_ tab: DocumentTab) -> some View {
         let isSelected = tab.id == selectedTabID
         let isHovered = hoveredTabID == tab.id
         let showsCloseButton = isSelected || isHovered
-        let gitStatus = git.status(for: tab.url)
+        let gitStatus = tab.url.flatMap { git.status(for: $0) }
 
         return HStack(spacing: 4) {
             Button {
                 onSelect(tab)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: FileIcon.symbolName(for: tab.url, isDirectory: false))
+                    Image(systemName: tabIcon(tab))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Text(tab.name)
@@ -156,26 +165,27 @@ struct DocumentTabBar: View {
             hoveredTabID = hovering ? tab.id : nil
         }
         .contextMenu {
-            if git.canShowDiff(for: tab.url) {
-                Button {
-                    onShowDiff(tab)
-                } label: {
-                    l10n("Show Git Diff")
-                }
-                Divider()
-            }
             Button {
                 onClose(tab)
             } label: {
                 l10n("Close Tab")
             }
-            Button {
-                FileOpener.reveal(tab.url)
-            } label: {
-                l10n("Show in Finder")
+            if let url = tab.url {
+                Button {
+                    FileOpener.reveal(url)
+                } label: {
+                    l10n("Show in Finder")
+                }
             }
         }
-        .help(tab.url.abbreviatedPath)
+        .help(helpText(for: tab))
+    }
+
+    private func helpText(for tab: DocumentTab) -> String {
+        switch tab.content {
+        case .file(let url, _): return url.abbreviatedPath
+        case .commitDiff(let document): return document.commit.hash
+        }
     }
 }
 
