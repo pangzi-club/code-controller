@@ -54,7 +54,7 @@ struct CodePane: NSViewRepresentable {
                 if entry.documentID != documentID {
                     // Same tab, new content (refresh): keep the anchor around.
                     let state = capture(entry)
-                    setText(text, in: entry.textView)
+                    setText(text, in: entry.textView, scrollView: entry.scrollView)
                     entry.documentID = documentID
                     restore(state, in: entry)
                 }
@@ -71,7 +71,7 @@ struct CodePane: NSViewRepresentable {
                 documentID: documentID,
                 lastUsed: clock
             )
-            setText(text, in: textView)
+            setText(text, in: textView, scrollView: scrollView)
             entries[tabID] = entry
             show(entry, tabID: tabID, in: container)
             evictIfNeeded()
@@ -99,10 +99,11 @@ struct CodePane: NSViewRepresentable {
             }
         }
 
-        private func setText(_ text: String, in textView: NSTextView) {
+        private func setText(_ text: String, in textView: NSTextView, scrollView: NSScrollView) {
             textView.textStorage?.setAttributedString(
                 NSAttributedString(string: text, attributes: CodeTextFactory.attributes())
             )
+            (scrollView.verticalRulerView as? LineNumberRulerView)?.update(text: text)
         }
 
         private func capture(_ entry: Entry) -> SavedState {
@@ -150,6 +151,15 @@ struct CodePane: NSViewRepresentable {
 
 enum CodeTextFactory {
     static let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    /// Pinned through `minimumLineHeight`/`maximumLineHeight` so the ruler can
+    /// place line numbers without querying TextKit layout.
+    static let lineHeight: CGFloat = (lineHeight(for: font) + 2).rounded()
+
+    private static let metricsManager = NSLayoutManager()
+
+    static func lineHeight(for font: NSFont) -> CGFloat {
+        metricsManager.defaultLineHeight(for: font)
+    }
 
     static func makeTextView() -> (scrollView: NSScrollView, textView: NSTextView) {
         let textView = NSTextView(usingTextLayoutManager: true)
@@ -190,6 +200,11 @@ enum CodeTextFactory {
         scrollView.backgroundColor = .controlBackgroundColor
         scrollView.documentView = textView
 
+        let ruler = LineNumberRulerView(textView: textView, scrollView: scrollView)
+        scrollView.verticalRulerView = ruler
+        scrollView.hasVerticalRuler = true
+        scrollView.rulersVisible = true
+
         return (scrollView, textView)
     }
 
@@ -203,7 +218,9 @@ enum CodeTextFactory {
 
     private static func paragraphStyle() -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineSpacing = 1
+        style.minimumLineHeight = lineHeight
+        style.maximumLineHeight = lineHeight
+        style.lineSpacing = 0
         let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
         style.tabStops = []
         style.defaultTabInterval = spaceWidth * 4

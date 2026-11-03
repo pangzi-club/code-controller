@@ -162,6 +162,18 @@ instead of a developer's home path.
   focus ring that SwiftUI cannot clear; the custom button must not introduce
   a new one. Apply the removal to the sidebar column's content — placing it
   on the split view or the detail column leaves the system toggle visible.
+- A horizontal SwiftUI `ScrollView` is not vertically inert: on macOS 27
+  SwiftUI sized the tab strip's document view 52pt taller than its 46pt clip
+  view (the titlebar's safe area leaked into it), so a vertical two-finger
+  scroll pushed the tabs out of the strip and left them there.
+  `DocumentTabBar` wraps its content in `TabVerticalScrollLock`, which pins
+  the clip view to y = 0 and sets `verticalScrollElasticity = .none`. Do not
+  remove it; horizontal scrolling and `ScrollViewReader.scrollTo` still work.
+- The code pane's line-number ruler assumes one fixed line height:
+  `CodeTextFactory.lineHeight` is pinned through `minimumLineHeight` /
+  `maximumLineHeight`, and the ruler derives visible lines from the scroll
+  offset instead of querying TextKit layout. If the editor font or spacing
+  changes, update that one constant.
 - SwiftUI window restoration keys the saved frame by the scene's explicit id,
   or by its content type when no id is given: the main `Window("", id: "main")`
   saves as `NSWindow Frame main` in the app's UserDefaults (the old

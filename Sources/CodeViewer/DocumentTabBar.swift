@@ -19,8 +19,10 @@ struct DocumentTabBar: View {
                     }
                 }
                 .padding(.horizontal, 8)
-                .frame(height: 34)
+                .frame(height: 46)
+                .background(TabVerticalScrollLock())
             }
+            .scrollBounceBehavior(.basedOnSize)
             .onChange(of: selectedTabID) { _, id in
                 guard let id else { return }
                 withAnimation(.easeOut(duration: 0.15)) {
@@ -28,7 +30,7 @@ struct DocumentTabBar: View {
                 }
             }
         }
-        .frame(height: 34)
+        .frame(height: 46)
         .background(Color(nsColor: .controlBackgroundColor))
         .overlay(alignment: .bottom) {
             Divider()
@@ -51,10 +53,12 @@ struct DocumentTabBar: View {
                     Text(tab.name)
                         .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                         .truncationMode(.middle)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(minWidth: 60, maxWidth: 180, alignment: .leading)
+                .frame(minWidth: 80, maxWidth: 200, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -80,7 +84,8 @@ struct DocumentTabBar: View {
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .frame(height: 26)
+        .padding(.vertical, 4)
+        .frame(height: 38)
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(isSelected ? Color.primary.opacity(0.09)
@@ -104,5 +109,66 @@ struct DocumentTabBar: View {
             }
         }
         .help(tab.url.abbreviatedPath)
+    }
+}
+
+/// SwiftUI lays the tab strip's document view out 52pt taller than the 46pt
+/// strip (the titlebar's safe area leaks into it). That leftover vertical
+/// range lets a two-finger scroll push the tabs out of view, and they stay
+/// out because the overscroll is a real offset, not a bounce. The strip is
+/// horizontal-only, so pin the clip view to y = 0 and drop vertical bounce.
+private struct TabVerticalScrollLock: NSViewRepresentable {
+    func makeNSView(context: Context) -> LockView {
+        LockView()
+    }
+
+    func updateNSView(_ view: LockView, context: Context) {
+        view.lockIfNeeded()
+    }
+
+    final class LockView: NSView {
+        private weak var scrollView: NSScrollView?
+        private var boundsObserver: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            lockIfNeeded()
+        }
+
+        func lockIfNeeded() {
+            guard let enclosing = enclosingScrollView else { return }
+            guard scrollView !== enclosing else { return }
+
+            scrollView = enclosing
+            enclosing.hasVerticalScroller = false
+            enclosing.verticalScrollElasticity = NSScrollView.Elasticity.none
+
+            let clipView = enclosing.contentView
+            clipView.postsBoundsChangedNotifications = true
+            if let boundsObserver {
+                NotificationCenter.default.removeObserver(boundsObserver)
+            }
+            boundsObserver = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: clipView,
+                queue: .main
+            ) { [weak self] _ in
+                self?.resetVerticalOffset()
+            }
+        }
+
+        private func resetVerticalOffset() {
+            guard let scrollView else { return }
+            let clipView = scrollView.contentView
+            guard abs(clipView.bounds.origin.y) > 0.5 else { return }
+            clipView.scroll(to: NSPoint(x: clipView.bounds.origin.x, y: 0))
+            scrollView.reflectScrolledClipView(clipView)
+        }
+
+        deinit {
+            if let boundsObserver {
+                NotificationCenter.default.removeObserver(boundsObserver)
+            }
+        }
     }
 }
