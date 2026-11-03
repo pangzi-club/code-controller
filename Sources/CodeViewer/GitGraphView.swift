@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Sidebar pane listing the workspace's recent commits in a single-lane
-/// graph: dot rail, subject, author and relative time, with the branch name
-/// badge on refs. Clicking a commit opens its merged diff in a tab.
+/// graph: dot rail, subject, short hash and relative time, with the branch
+/// name badge on refs. Clicking a commit opens its merged diff in a tab.
 struct GitGraphView: View {
     let git: GitStatusStore
     let onSelect: (GitCommit) -> Void
@@ -56,21 +56,21 @@ private struct GitGraphRowView: View {
         HStack(alignment: .center, spacing: 6) {
             graphRail
                 .frame(width: 14)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(commit.subject)
                     .font(.system(size: 12))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(commit.authorName)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(relativeDate)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary.opacity(0.75))
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(commit.hash.prefix(7))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Text(relativeDate)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary.opacity(0.75))
+                }
+                .lineLimit(1)
             }
             Spacer(minLength: 0)
             if let refName = commit.refName {
@@ -83,7 +83,7 @@ private struct GitGraphRowView: View {
                     .lineLimit(1)
             }
         }
-        .frame(height: 44)
+        .frame(height: 36)
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -98,15 +98,20 @@ private struct GitGraphRowView: View {
     }
 
     /// One vertical rail segment with a dot: the list is linear here, so a
-    /// plain lane matches `git log`'s first-parent history.
+    /// plain lane matches `git log`'s first-parent history. The dot aligns
+    /// with the subject line (top row), not the row's vertical center.
     private var graphRail: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Rectangle()
                 .fill(Color.secondary.opacity(0.25))
                 .frame(width: 1)
             Circle()
                 .fill(Color.accentColor)
                 .frame(width: 7, height: 7)
+                // Center of the subject line: in the 36pt row the 12pt
+                // subject + 10pt hash stack sits ~10.5pt down, so the dot
+                // starts 7pt from the top.
+                .padding(.top, 7)
         }
     }
 
