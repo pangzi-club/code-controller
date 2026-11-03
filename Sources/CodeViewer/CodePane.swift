@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Hosts the text view for the selected tab. One NSTextView is kept per tab,
-/// up to `capacity`; switching tabs swaps views in O(1) so scroll position and
+/// Hosts the editor for the selected tab. One editor is kept per tab, up to
+/// `capacity`; switching tabs swaps views in O(1) so scroll position and
 /// selection survive. Evicted tabs keep their scroll anchor and are rebuilt
 /// from the tab's `DocumentStore` text when shown again.
 struct CodePane: NSViewRepresentable {
@@ -16,6 +16,7 @@ struct CodePane: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView()
+        container.clipsToBounds = true
         context.coordinator.container = container
         return container
     }
@@ -30,8 +31,7 @@ struct CodePane: NSViewRepresentable {
         weak var container: NSView?
 
         private struct Entry {
-            let scrollView: NSScrollView
-            let textView: NSTextView
+            let editorView: CodeEditorView
             var documentID: String
             var lastUsed: Int
         }
@@ -52,9 +52,8 @@ struct CodePane: NSViewRepresentable {
 
             if var entry = entries[tabID] {
                 if entry.documentID != documentID {
-                    // Same tab, new content (refresh): keep the anchor around.
                     let state = capture(entry)
-                    setText(text, in: entry.textView, scrollView: entry.scrollView)
+                    entry.editorView.setText(text)
                     entry.documentID = documentID
                     restore(state, in: entry)
                 }
@@ -64,81 +63,66 @@ struct CodePane: NSViewRepresentable {
                 return
             }
 
-            let (scrollView, textView) = CodeTextFactory.makeTextView()
+            let editorView = CodeEditorView()
+            editorView.setText(text)
             let entry = Entry(
-                scrollView: scrollView,
-                textView: textView,
+                editorView: editorView,
                 documentID: documentID,
                 lastUsed: clock
             )
-            setText(text, in: textView, scrollView: scrollView)
             entries[tabID] = entry
             show(entry, tabID: tabID, in: container)
             evictIfNeeded()
         }
 
-        /// Saves the outgoing tab's anchor, mounts the new scroll view, and
-        /// restores the incoming tab's anchor. Re-adding a scroll view can reset
-        /// its clip view, so the explicit restore is what keeps the position.
         private func show(_ entry: Entry, tabID: String, in container: NSView) {
             guard currentTabID != tabID else { return }
 
             if let currentTabID, let current = entries[currentTabID] {
                 savedStates[currentTabID] = capture(current)
-                current.scrollView.removeFromSuperview()
+                current.editorView.removeFromSuperview()
             }
 
             container.subviews.forEach { $0.removeFromSuperview() }
-            entry.scrollView.frame = container.bounds
-            entry.scrollView.autoresizingMask = [.width, .height]
-            container.addSubview(entry.scrollView)
+            entry.editorView.frame = container.bounds
+            entry.editorView.autoresizingMask = [.width, .height]
+            container.addSubview(entry.editorView)
+            entry.editorView.layoutSubtreeIfNeeded()
             currentTabID = tabID
-            // Re-tile once the scroll view has a real frame: the ruler was
-            // attached before the view was mounted, and a stale layout leaves
-            // the clip view full-width so the ruler covers the first glyphs.
-            entry.scrollView.tile()
 
             if let saved = savedStates[tabID] {
                 restore(saved, in: entry)
             }
         }
 
-        private func setText(_ text: String, in textView: NSTextView, scrollView: NSScrollView) {
-            textView.textStorage?.setAttributedString(
-                NSAttributedString(string: text, attributes: CodeTextFactory.attributes())
-            )
-            (scrollView.verticalRulerView as? LineNumberRulerView)?.update(text: text)
-        }
-
         private func capture(_ entry: Entry) -> SavedState {
             SavedState(
-                scrollOrigin: entry.scrollView.contentView.bounds.origin,
-                selection: entry.textView.selectedRange()
+                scrollOrigin: entry.editorView.scrollView.contentView.bounds.origin,
+                selection: entry.editorView.textView.selectedRange()
             )
         }
 
         private func restore(_ state: SavedState, in entry: Entry) {
-            entry.scrollView.layoutSubtreeIfNeeded()
+            let editorView = entry.editorView
+            editorView.layoutSubtreeIfNeeded()
 
-            let clipView = entry.scrollView.contentView
-            let contentSize = entry.scrollView.documentView?.frame.size ?? .zero
-            // The ruler is an overlay: AppKit parks the clip view at
-            // -ruleThickness so the document starts to its right. Clamping x
-            // to 0 slides the first characters back under the ruler.
-            let minX = -(entry.scrollView.verticalRulerView?.ruleThickness ?? 0)
-            let maxX = max(minX, contentSize.width - clipView.bounds.width)
+            let clipView = editorView.scrollView.contentView
+            let contentSize = editorView.textView.frame.size
+            let maxX = max(0, contentSize.width - clipView.bounds.width)
             let maxY = max(0, contentSize.height - clipView.bounds.height)
             let origin = NSPoint(
-                x: min(max(minX, state.scrollOrigin.x), maxX),
+                x: min(max(0, state.scrollOrigin.x), maxX),
                 y: min(max(0, state.scrollOrigin.y), maxY)
             )
             clipView.scroll(to: origin)
-            entry.scrollView.reflectScrolledClipView(clipView)
+            editorView.scrollView.reflectScrolledClipView(clipView)
 
-            let length = (entry.textView.string as NSString).length
+            let length = (editorView.textView.string as NSString).length
             let location = min(state.selection.location, length)
             let selectionLength = min(state.selection.length, max(0, length - location))
-            entry.textView.setSelectedRange(NSRange(location: location, length: selectionLength))
+            editorView.textView.setSelectedRange(
+                NSRange(location: location, length: selectionLength)
+            )
         }
 
         private func evictIfNeeded() {
@@ -150,10 +134,65 @@ struct CodePane: NSViewRepresentable {
                     break
                 }
                 savedStates[victim] = capture(entry)
-                entry.scrollView.removeFromSuperview()
+                entry.editorView.removeFromSuperview()
                 entries.removeValue(forKey: victim)
             }
         }
+    }
+}
+
+final class CodeEditorView: NSView {
+    let scrollView: NSScrollView
+    let textView: NSTextView
+
+    private let lineNumberView: LineNumberRulerView
+    private var lineNumberWidthConstraint: NSLayoutConstraint!
+
+    init() {
+        let content = CodeTextFactory.makeTextView()
+        scrollView = content.scrollView
+        textView = content.textView
+        lineNumberView = LineNumberRulerView(
+            textView: content.textView,
+            scrollView: content.scrollView
+        )
+        super.init(frame: .zero)
+
+        clipsToBounds = true
+        lineNumberView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(lineNumberView)
+        addSubview(scrollView)
+
+        lineNumberWidthConstraint = lineNumberView.widthAnchor.constraint(
+            equalToConstant: LineNumberRulerView.minimumWidth
+        )
+        NSLayoutConstraint.activate([
+            lineNumberWidthConstraint,
+            lineNumberView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            lineNumberView.topAnchor.constraint(equalTo: topAnchor),
+            lineNumberView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: lineNumberView.trailingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+
+        lineNumberView.onWidthChange = { [weak self] width in
+            self?.lineNumberWidthConstraint.constant = width
+        }
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func setText(_ text: String) {
+        textView.textStorage?.setAttributedString(
+            NSAttributedString(string: text, attributes: CodeTextFactory.attributes())
+        )
+        lineNumberView.update(text: text)
     }
 }
 
@@ -170,7 +209,7 @@ enum CodeTextFactory {
     }
 
     static func makeTextView() -> (scrollView: NSScrollView, textView: NSTextView) {
-        let textView = NSTextView(usingTextLayoutManager: true)
+        let textView = NSTextView(usingTextLayoutManager: false)
         textView.isEditable = false
         textView.isSelectable = true
         textView.isRichText = false
@@ -183,7 +222,8 @@ enum CodeTextFactory {
         textView.font = font
         textView.defaultParagraphStyle = paragraphStyle()
         textView.typingAttributes = attributes()
-        textView.textContainerInset = NSSize(width: 16, height: 12)
+        textView.textContainerInset = .zero
+        textView.textContainer?.lineFragmentPadding = 4
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
         textView.minSize = .zero
@@ -196,7 +236,6 @@ enum CodeTextFactory {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
         )
-        // Long lines scroll horizontally instead of wrapping, like an editor.
         textView.textContainer?.widthTracksTextView = false
 
         let scrollView = NSScrollView()
@@ -207,11 +246,6 @@ enum CodeTextFactory {
         scrollView.drawsBackground = true
         scrollView.backgroundColor = .controlBackgroundColor
         scrollView.documentView = textView
-
-        let ruler = LineNumberRulerView(textView: textView, scrollView: scrollView)
-        scrollView.verticalRulerView = ruler
-        scrollView.hasVerticalRuler = true
-        scrollView.rulersVisible = true
 
         return (scrollView, textView)
     }

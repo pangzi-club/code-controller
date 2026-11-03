@@ -11,6 +11,7 @@ struct DocumentTabBar: View {
 
     @State private var hoveredTabID: DocumentTab.ID?
     @State private var viewportWidth: CGFloat = 0
+    @State private var contentHeight = Self.minimumHeight
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -23,6 +24,14 @@ struct DocumentTabBar: View {
                 }
                 .padding(.horizontal, Self.horizontalPadding)
                 .padding(.vertical, Self.verticalPadding)
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: TabContentHeightKey.self,
+                            value: geometry.size.height
+                        )
+                    }
+                )
                 .background(TabVerticalScrollLock())
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -41,8 +50,12 @@ struct DocumentTabBar: View {
                 }
             }
         }
+        .frame(height: max(Self.minimumHeight, contentHeight))
         .onPreferenceChange(TabViewportWidthKey.self) { width in
             viewportWidth = width
+        }
+        .onPreferenceChange(TabContentHeightKey.self) { height in
+            contentHeight = height
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) {
@@ -52,6 +65,7 @@ struct DocumentTabBar: View {
 
     private static let horizontalPadding: CGFloat = 8
     private static let verticalPadding: CGFloat = 4
+    private static let minimumHeight = TabRowsLayout.tabHeight + verticalPadding * 2
 
     private var availableRowWidth: CGFloat {
         guard viewportWidth > 0 else { return .infinity }
@@ -131,6 +145,14 @@ struct DocumentTabBar: View {
 }
 
 private struct TabViewportWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct TabContentHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {

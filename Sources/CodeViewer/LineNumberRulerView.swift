@@ -3,8 +3,13 @@ import AppKit
 /// Line numbers for a non-wrapping text view. Because the code pane uses one
 /// fixed line height, visible lines can be derived from the scroll offset
 /// without laying out the whole document.
-final class LineNumberRulerView: NSRulerView {
+final class LineNumberRulerView: NSView {
+    static let minimumWidth: CGFloat = 36
+
+    var onWidthChange: ((CGFloat) -> Void)?
+
     private weak var textView: NSTextView?
+    private weak var scrollView: NSScrollView?
     private var lineCount = 1
     private var boundsObserver: NSObjectProtocol?
 
@@ -13,8 +18,8 @@ final class LineNumberRulerView: NSRulerView {
 
     init(textView: NSTextView, scrollView: NSScrollView) {
         self.textView = textView
-        super.init(scrollView: scrollView, orientation: .verticalRuler)
-        clientView = textView
+        self.scrollView = scrollView
+        super.init(frame: .zero)
 
         scrollView.contentView.postsBoundsChangedNotifications = true
         boundsObserver = NotificationCenter.default.addObserver(
@@ -50,23 +55,20 @@ final class LineNumberRulerView: NSRulerView {
     func update(text: String) {
         lineCount = Self.lineCount(in: text)
         let digits = String(lineCount).count
-        let thickness = max(36, CGFloat(digits) * 7 + horizontalPadding * 2)
-        if abs(ruleThickness - thickness) > 0.5 {
-            ruleThickness = thickness
-            scrollView?.tile()
-        }
+        let width = max(Self.minimumWidth, CGFloat(digits) * 7 + horizontalPadding * 2)
+        onWidthChange?(width)
         needsDisplay = true
     }
 
-    override func drawHashMarksAndLabels(in rect: NSRect) {
+    override func draw(_ dirtyRect: NSRect) {
         NSColor.controlBackgroundColor.setFill()
-        bounds.fill()
+        dirtyRect.fill()
 
         NSColor.separatorColor.setStroke()
         let separator = NSBezierPath()
         separator.lineWidth = 1
-        separator.move(to: NSPoint(x: bounds.maxX - 0.5, y: bounds.minY))
-        separator.line(to: NSPoint(x: bounds.maxX - 0.5, y: bounds.maxY))
+        separator.move(to: NSPoint(x: bounds.maxX - 0.5, y: dirtyRect.minY))
+        separator.line(to: NSPoint(x: bounds.maxX - 0.5, y: dirtyRect.maxY))
         separator.stroke()
 
         guard let textView, let scrollView else { return }
