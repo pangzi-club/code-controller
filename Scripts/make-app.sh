@@ -196,7 +196,7 @@ for ARCH in "${ARCH_LIST[@]}"; do
         APP_SUFFIX="-$ARCH"
     fi
 
-    echo "==> Building (release): $ARCH…"
+    echo "==> Building (release): ${ARCH}…"
     # Single-arch builds reuse one product directory, so package each
     # architecture immediately instead of copying them all after the loop.
     swift build -c release "${SWIFT_ARCH_ARGS[@]}"
@@ -263,7 +263,7 @@ if [[ "$MAS" == "1" ]]; then
         || die "MAS=1 needs an installer certificate (Mac Installer Distribution) — set INSTALLER_IDENTITY"
     MAS_APP_DIR="$BUILD_DIR/$EFFECTIVE_DISPLAY_NAME.app"
     PKG="$BUILD_DIR/$APP_DISPLAY_NAME-$VERSION-$BUILD.pkg"
-    echo "==> Packaging $PKG…"
+    echo "==> Packaging ${PKG}…"
     productbuild --component "$MAS_APP_DIR" /Applications --sign "$INSTALLER_IDENTITY" "$PKG"
     echo "    installer identity: $INSTALLER_IDENTITY"
 fi
