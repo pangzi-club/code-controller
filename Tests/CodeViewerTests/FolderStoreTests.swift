@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import DemoExplorer
+@testable import CodeViewer
 
 // Serialized: the tests share the folder UserDefaults keys.
 @Suite(.serialized)

@@ -5,20 +5,20 @@
       "request": "launch",
       "args": [],
       "cwd": "${workspaceFolder}",
-      "name": "Debug DemoExplorerApp",
-      "target": "DemoExplorerApp",
+      "name": "Debug CodeViewerApp",
+      "target": "CodeViewerApp",
       "configuration": "debug",
-      "preLaunchTask": "swift: Build Debug DemoExplorerApp"
+      "preLaunchTask": "swift: Build Debug CodeViewerApp"
     },
     {
       "type": "swift",
       "request": "launch",
       "args": [],
       "cwd": "${workspaceFolder}",
-      "name": "Release DemoExplorerApp",
-      "target": "DemoExplorerApp",
+      "name": "Release CodeViewerApp",
+      "target": "CodeViewerApp",
       "configuration": "release",
-      "preLaunchTask": "swift: Build Release DemoExplorerApp"
+      "preLaunchTask": "swift: Build Release CodeViewerApp"
     }
   ]
 }

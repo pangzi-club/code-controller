@@ -1,6 +1,6 @@
 import SwiftUI
 import Testing
-@testable import DemoExplorer
+@testable import CodeViewer
 
 // Serialized: the tests share the `theme` and `language` UserDefaults keys.
 @Suite(.serialized)

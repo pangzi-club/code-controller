@@ -1,15 +1,15 @@
 import Foundation
 import Testing
-@testable import DemoExplorer
+@testable import CodeViewer
 
 @Suite
 struct LocalizationTests {
     private func loadStrings(_ language: String) throws -> [String: String] {
         let url = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // DemoExplorerTests
+            .deletingLastPathComponent() // CodeViewerTests
             .deletingLastPathComponent() // Tests
             .deletingLastPathComponent() // repository root
-            .appendingPathComponent("Sources/DemoExplorer/Resources")
+            .appendingPathComponent("Sources/CodeViewer/Resources")
             .appendingPathComponent("\(language).lproj/Localizable.strings")
 
         let parsed = NSDictionary(contentsOfFile: url.path) as? [String: String]

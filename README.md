@@ -1,4 +1,4 @@
-# DemoExplorer
+# CodeViewer
 
 [English](README.md) | [中文](README.ZH.md)
 
@@ -69,8 +69,8 @@ window appears. Stream live with:
 ## Xcode Previews
 
 Open `Package.swift` in Xcode (it synthesizes the schemes; `.swiftpm/` is
-gitignored). The package has two targets: the **DemoExplorer** library with
-all views, models and stores, and the **DemoExplorerApp** executable that only
+gitignored). The package has two targets: the **CodeViewer** library with
+all views, models and stores, and the **CodeViewerApp** executable that only
 holds the `@main` entry point. Previews need a library product — a
 command-line-tool target cannot power the canvas — so the views (each file
 ends in a `#Preview` block) preview against the library scheme. Types used by
@@ -106,9 +106,9 @@ For the proper experience (Dock icon, menu bar, Cmd+Tab, double-clickable in
 Finder), assemble a universal app bundle:
 
 ```bash
-make app                    # build/DemoExplorer.app (arm64 + x86_64)
-make launch                 # build/DemoExplorer-Dev-<host arch>.app, opened
-make install                # universal build, then replace /Applications/DemoExplorer.app
+make app                    # build/CodeViewer.app (arm64 + x86_64)
+make launch                 # build/CodeViewer-Dev-<host arch>.app, opened
+make install                # universal build, then replace /Applications/CodeViewer.app
 ```
 
 `make-app.sh` builds a release bundle for the requested architectures: by
@@ -143,7 +143,7 @@ vice versa).
 ### App Store
 
 ```bash
-make mas                    # build/DemoExplorer-0.1-1.pkg
+make mas                    # build/CodeViewer-0.1-1.pkg
 ```
 
 `make mas` signs with Apple Distribution and writes a `.pkg` for Transporter.
@@ -166,7 +166,7 @@ follows the user's language.
 
 ```
 Sources/
-├── DemoExplorer/                 # Library target: all views, models, stores
+├── CodeViewer/                 # Library target: all views, models, stores
 │   ├── AppInfo.swift             # Display name / bundle ID / version / build (single source of truth)
 │   ├── ContentView.swift         # Split layout with sidebar and detail pane
 │   ├── FileListView.swift        # Card-style file list
@@ -181,9 +181,9 @@ Sources/
 │       ├── en.lproj/Localizable.strings
 │       ├── zh-Hans.lproj/Localizable.strings
 │       └── PrivacyInfo.xcprivacy  # Required-reason API declarations
-└── DemoExplorerApp/
-    └── DemoExplorerApp.swift     # Thin @main entry point and window scene
-Tests/DemoExplorerTests/          # Swift Testing suite
+└── CodeViewerApp/
+    └── CodeViewerApp.swift     # Thin @main entry point and window scene
+Tests/CodeViewerTests/          # Swift Testing suite
 Scripts/
 ├── App.entitlements              # Local/Developer ID entitlements (unsandboxed)
 ├── App.sandbox.entitlements      # App Store: sandbox + user-selected files + bookmarks

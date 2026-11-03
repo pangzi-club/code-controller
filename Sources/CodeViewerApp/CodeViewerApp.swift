@@ -1,9 +1,9 @@
 import AppKit
-import DemoExplorer
+import CodeViewer
 import SwiftUI
 
 @main
-struct DemoExplorerApp: App {
+struct CodeViewerApp: App {
     @StateObject private var settings = SettingsStore()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow

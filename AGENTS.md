@@ -8,8 +8,8 @@ A SwiftUI macOS desktop app template built with SwiftPM only — there is no
 `.xcodeproj`. Targets macOS 14+ with Swift tools 5.9. The demo app is a small
 file browser; replace its domain code when forking the template.
 
-The package has two targets: a **library** (`DemoExplorer`, all the views,
-models, stores and helpers) and a thin **executable** (`DemoExplorerApp`, just
+The package has two targets: a **library** (`CodeViewer`, all the views,
+models, stores and helpers) and a thin **executable** (`CodeViewerApp`, just
 the `@main` entry point). Splitting them lets Xcode Previews work — open
 `Package.swift` in Xcode and preview with the library scheme; previews require
 a library product, not a command-line tool. Previews that need sample file
@@ -74,7 +74,7 @@ instead of a developer's home path.
   (the `/usr/bin/` prefix dodges zsh's builtin `log`). Crash reports come from
   macOS: `~/Library/Logs/DiagnosticReports/<executable target>-*.ips`.
 - **Tests** use Swift Testing (`import Testing`, `@Test`, `#expect`) and live
-  in `Tests/DemoExplorerTests/`. Add tests for new logic in `Models.swift`,
+  in `Tests/CodeViewerTests/`. Add tests for new logic in `Models.swift`,
   stores, and helpers; views don't need snapshot tests in this template.
   Suites that share a UserDefaults key are `@Suite(.serialized)` — keep that
   when adding UserDefaults-touching tests, Swift Testing runs in parallel.
@@ -99,9 +99,9 @@ instead of a developer's home path.
   on demand and is not restored at launch. `openSettings` is available on
   macOS 14 if a fork adds a programmatic opener. The standard menu item and
   window title follow the system language, not the in-app language override.
-- **Access control**: the library target (`Sources/DemoExplorer/`) must mark
+- **Access control**: the library target (`Sources/CodeViewer/`) must mark
   types and members `public` when the executable target
-  (`Sources/DemoExplorerApp/`) uses them. Protocol requirements (`body`, …) on
+  (`Sources/CodeViewerApp/`) uses them. Protocol requirements (`body`, …) on
   public types must also be `public`.
 
 ## Sandbox and distribution
@@ -176,7 +176,7 @@ instead of a developer's home path.
   click. The main scene is therefore a `Window("", id: "main")`, a single
   unique instance: the system restore and the environment's `openWindow`
   action both resolve to the same window, so the race is structural, not
-  timing-based. The `AppDelegate` adaptor in `DemoExplorerApp.swift` returns
+  timing-based. The `AppDelegate` adaptor in `CodeViewerApp.swift` returns
   `true` to let the system restore, and only after a 0.6 s single-flight delay
   (which absorbs the second event of a double click) calls `openWindow` when
   no visible main window exists — that fallback only fires on older systems.

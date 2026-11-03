@@ -1,12 +1,12 @@
 import Foundation
 import Testing
-@testable import DemoExplorer
+@testable import CodeViewer
 
 struct FileLoaderTests {
     /// Makes a temp folder populated with a fixed set of entries.
     private func makeSampleFolder() throws -> URL {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("DemoExplorerTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("CodeViewerTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
         try FileManager.default.createDirectory(at: root.appendingPathComponent("Zeta"), withIntermediateDirectories: true)
@@ -45,7 +45,7 @@ struct FileLoaderTests {
     @Test("a missing folder yields nil")
     func missingFolderYieldsNil() {
         let missing = FileManager.default.temporaryDirectory
-            .appendingPathComponent("DemoExplorerTests-missing-\(UUID().uuidString)")
+            .appendingPathComponent("CodeViewerTests-missing-\(UUID().uuidString)")
         #expect(FileLoader.load(from: missing) == nil)
     }
 

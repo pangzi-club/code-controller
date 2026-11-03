@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "DemoExplorer",
+    name: "CodeViewer",
     defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
@@ -10,25 +10,25 @@ let package = Package(
     products: [
         // The library carries all app code so the test target can import it;
         // the executable below is a thin @main wrapper.
-        .library(name: "DemoExplorer", targets: ["DemoExplorer"]),
+        .library(name: "CodeViewer", targets: ["CodeViewer"]),
     ],
     targets: [
         .target(
-            name: "DemoExplorer",
-            path: "Sources/DemoExplorer",
+            name: "CodeViewer",
+            path: "Sources/CodeViewer",
             resources: [
                 .process("Resources")
             ]
         ),
         .executableTarget(
-            name: "DemoExplorerApp",
-            dependencies: ["DemoExplorer"],
-            path: "Sources/DemoExplorerApp"
+            name: "CodeViewerApp",
+            dependencies: ["CodeViewer"],
+            path: "Sources/CodeViewerApp"
         ),
         .testTarget(
-            name: "DemoExplorerTests",
-            dependencies: [.target(name: "DemoExplorer")],
-            path: "Tests/DemoExplorerTests"
+            name: "CodeViewerTests",
+            dependencies: [.target(name: "CodeViewer")],
+            path: "Tests/CodeViewerTests"
         )
     ]
 )

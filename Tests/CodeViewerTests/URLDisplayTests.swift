@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import DemoExplorer
+@testable import CodeViewer
 
 @Suite
 struct URLDisplayTests {

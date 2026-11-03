@@ -10,7 +10,7 @@ enum PreviewFixtures {
     private static func makeSampleFolder() -> URL {
         let fileManager = FileManager.default
         let folder = fileManager.temporaryDirectory
-            .appendingPathComponent("DemoExplorerPreviews", isDirectory: true)
+            .appendingPathComponent("CodeViewerPreviews", isDirectory: true)
             .appendingPathComponent("Design", isDirectory: true)
         try? fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
 

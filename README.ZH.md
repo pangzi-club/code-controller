@@ -1,4 +1,4 @@
-# DemoExplorer
+# CodeViewer
 
 [English](README.md) | [中文](README.ZH.md)
 
@@ -51,7 +51,7 @@ swift test    # 或：make test
 
 ## Xcode Preview
 
-用 Xcode 打开 `Package.swift`（scheme 由 Xcode 自动生成；`.swiftpm/` 已被 gitignore）。包内有两个 target：**DemoExplorer** library 包含全部视图、模型和 store；**DemoExplorerApp** executable 只保留 `@main` 入口。Preview 必须依赖 library 产物 —— 命令行工具类型的 target 无法驱动画布 —— 因此各视图文件末尾的 `#Preview` 都走 library scheme。executable target 要用到的类型需要标记 `public`。需要文件数据的 Preview 使用 `PreviewFixtures`，它在临时目录里生成示例文件夹，而不是指向开发者本机路径。
+用 Xcode 打开 `Package.swift`（scheme 由 Xcode 自动生成；`.swiftpm/` 已被 gitignore）。包内有两个 target：**CodeViewer** library 包含全部视图、模型和 store；**CodeViewerApp** executable 只保留 `@main` 入口。Preview 必须依赖 library 产物 —— 命令行工具类型的 target 无法驱动画布 —— 因此各视图文件末尾的 `#Preview` 都走 library scheme。executable target 要用到的类型需要标记 `public`。需要文件数据的 Preview 使用 `PreviewFixtures`，它在临时目录里生成示例文件夹，而不是指向开发者本机路径。
 
 ## 作为模板使用
 
@@ -71,9 +71,9 @@ swift test    # 或：make test
 想要完整体验（Dock 图标、菜单栏、Cmd+Tab、可在 Finder 中双击打开），需要组装 universal 应用包：
 
 ```bash
-make app                    # 产物：build/DemoExplorer.app（arm64 + x86_64）
-make launch                 # 产物：build/DemoExplorer-Dev-<本机架构>.app，并打开
-make install                # 构建 universal 包，然后替换 /Applications/DemoExplorer.app
+make app                    # 产物：build/CodeViewer.app（arm64 + x86_64）
+make launch                 # 产物：build/CodeViewer-Dev-<本机架构>.app，并打开
+make install                # 构建 universal 包，然后替换 /Applications/CodeViewer.app
 ```
 
 `make-app.sh` 按 `ARCHS` 指定的架构构建 release 包：`make app` 默认把 arm64 和 x86_64 lipo 合并成单个 universal `build/<显示名>.app`，同一份包在 Apple Silicon 和 Intel Mac 上都原生运行；可用 `ARCHS` 覆盖，例如 `ARCHS=arm64 make app` 构建本机架构的瘦包，或 `ARCHS="arm64 x86_64" make app` 每个架构各出一个包（`build/<显示名>-<架构>.app`）。每个包都会生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist，并复制隐私清单。`make app` 会使用 `Scripts/App.entitlements` 签名，优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。本地和 Developer ID 构建**默认不开启沙盒**，需要本地或 hardened runtime 权限时往该文件里加。
@@ -85,7 +85,7 @@ App Store 构建开启 App Sandbox，因此 demo 用 security-scoped bookmark �
 ### App Store
 
 ```bash
-make mas                    # 产物：build/DemoExplorer-0.1-1.pkg
+make mas                    # 产物：build/CodeViewer-0.1-1.pkg
 ```
 
 `make mas` 使用 Apple Distribution 签名并生成供 Transporter 使用的 `.pkg`；包内是单个 universal（arm64 + x86_64）沙盒应用。它使用 `Scripts/App.sandbox.entitlements`，如果该文件没有开启 App Sandbox 会直接报错。每次上传前递增 `AppInfo.build`（对应 `CFBundleVersion`）；`CFBundleShortVersionString` 来自 `AppInfo.version`。普通 App Store 提交不需要 provisioning profile，但 TestFlight 需要——传入 `PROVISION_PROFILE=...` 即可嵌入。公证（notarization）只用于 Developer ID 分发，不用于 App Store。`INSTALLER_IDENTITY` 可覆盖安装器证书。
@@ -96,7 +96,7 @@ make mas                    # 产物：build/DemoExplorer-0.1-1.pkg
 
 ```
 Sources/
-├── DemoExplorer/                 # Library target：全部视图、模型、store
+├── CodeViewer/                 # Library target：全部视图、模型、store
 │   ├── AppInfo.swift             # 显示名 / bundle ID / 版本 / 构建号（唯一事实来源）
 │   ├── ContentView.swift         # 分栏布局：侧边栏 + 详情页
 │   ├── FileListView.swift        # 卡片式文件列表
@@ -111,9 +111,9 @@ Sources/
 │       ├── en.lproj/Localizable.strings
 │       ├── zh-Hans.lproj/Localizable.strings
 │       └── PrivacyInfo.xcprivacy  # required-reason API 声明
-└── DemoExplorerApp/
-    └── DemoExplorerApp.swift     # 薄 @main 入口和窗口场景
-Tests/DemoExplorerTests/          # Swift Testing 测试
+└── CodeViewerApp/
+    └── CodeViewerApp.swift     # 薄 @main 入口和窗口场景
+Tests/CodeViewerTests/          # Swift Testing 测试
 Scripts/
 ├── App.entitlements              # 本地/Developer ID 权限（不沙盒）
 ├── App.sandbox.entitlements      # App Store：沙盒 + 用户选择文件 + bookmark
