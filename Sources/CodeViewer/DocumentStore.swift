@@ -10,7 +10,7 @@ enum DocumentState {
     case failed
 }
 
-/// Owns the document currently shown in the code pane. Reads happen in
+/// Owns the document currently shown in one tab. Reads happen in
 /// `FileService`; the store only receives immutable results on the main actor
 /// and drops them when a newer file has been requested.
 @MainActor
@@ -20,15 +20,23 @@ final class DocumentStore {
     private(set) var state: DocumentState = .empty
     private(set) var revision = 0
 
-    @ObservationIgnored private let service: FileService
+    /// Distinguishes two stores for the same path (close and reopen) so the
+    /// text view pool can tell that its cached text is stale.
+    private let instanceID = UUID()
+    private let service: FileService
+
     @ObservationIgnored private var loadTask: Task<Void, Never>?
 
     init(service: FileService = .shared) {
         self.service = service
     }
 
-    func open(_ node: FileNode) {
-        load(from: node.url)
+    var versionID: String {
+        "\(instanceID.uuidString)#\(revision)"
+    }
+
+    func open(url: URL) {
+        load(from: url)
     }
 
     func reload() {
@@ -61,46 +69,5 @@ final class DocumentStore {
             case nil: self.state = .failed
             }
         }
-    }
-}
-
-/// Per-workspace UI state — tree expansion, the open document, and later tabs
-/// and git state. Sessions live for the lifetime of the app so switching
-/// workspaces is instant.
-@MainActor
-@Observable
-final class WorkspaceSession {
-    let workspace: Workspace
-    let tree: FileTreeStore
-    let document: DocumentStore
-
-    @ObservationIgnored private var hasLoadedTree = false
-
-    init(workspace: Workspace, service: FileService = .shared) {
-        self.workspace = workspace
-        tree = FileTreeStore(root: workspace.url, service: service)
-        document = DocumentStore(service: service)
-    }
-
-    func loadIfNeeded() async {
-        guard !hasLoadedTree else { return }
-        hasLoadedTree = true
-        await tree.loadRoot()
-    }
-}
-
-@MainActor
-final class WorkspaceSessions {
-    private var sessions: [Workspace.ID: WorkspaceSession] = [:]
-
-    func session(for workspace: Workspace) -> WorkspaceSession {
-        if let existing = sessions[workspace.id] { return existing }
-        let session = WorkspaceSession(workspace: workspace)
-        sessions[workspace.id] = session
-        return session
-    }
-
-    func remove(_ workspace: Workspace) {
-        sessions.removeValue(forKey: workspace.id)
     }
 }

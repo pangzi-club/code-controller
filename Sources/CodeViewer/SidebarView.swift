@@ -29,7 +29,11 @@ struct SidebarView: View {
                     .padding(.bottom, 4)
 
                 if let session {
-                    FileTreeView(tree: session.tree, document: session.document)
+                    FileTreeView(
+                        tree: session.tree,
+                        selectedURL: session.selectedURL,
+                        onOpen: { session.open($0) }
+                    )
                 } else {
                     Spacer()
                 }

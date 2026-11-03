@@ -94,7 +94,7 @@ public struct ContentView: View {
             WorkspaceDetailView(workspace: workspace, session: session) {
                 Task {
                     await session.tree.reload()
-                    session.document.reload()
+                    session.reloadSelectedDocument()
                 }
             }
         } else {
@@ -164,93 +164,136 @@ private struct WorkspaceDetailView: View {
     let onRefresh: () -> Void
 
     private var title: String {
-        session.document.url?.lastPathComponent ?? workspace.name
+        session.selectedTab?.name ?? workspace.name
     }
 
     var body: some View {
-        content
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .navigation) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                }
-                // hiddenTitleBar leaves no trailing flexible region; without this
-                // the primary actions pack next to the title.
-                ToolbarItem {
-                    Spacer()
-                }
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button {
-                        FileOpener.reveal(session.document.url ?? workspace.url)
-                    } label: {
-                        Label {
-                            l10n("Show in Finder")
-                        } icon: {
-                            Image(systemName: "arrow.up.forward.app")
-                                .frame(width: 16, height: 16)
-                        }
-                    }
-                    .help(l10nString("Show in Finder"))
-                    Button(action: onRefresh) {
-                        Label {
-                            l10n("Refresh")
-                        } icon: {
-                            Image(systemName: "arrow.clockwise")
-                                .frame(width: 16, height: 16)
-                        }
-                    }
-                    .help(l10nString("Refresh"))
-                    // Toolbar adds 8pt; match the visible glyph to the card's 20pt inset.
-                    .padding(.trailing, 7)
-                }
+        VStack(spacing: 0) {
+            if !session.tabs.isEmpty {
+                DocumentTabBar(
+                    tabs: session.tabs,
+                    selectedTabID: session.selectedTabID,
+                    onSelect: { session.select($0) },
+                    onClose: { session.close($0) }
+                )
             }
+
+            ZStack {
+                codePane
+                    .accessibilityHidden(hasOverlay)
+                    .allowsHitTesting(!hasOverlay)
+                overlay
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+        .navigationTitle(title)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+            }
+            // hiddenTitleBar leaves no trailing flexible region; without this
+            // the primary actions pack next to the title.
+            ToolbarItem {
+                Spacer()
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    FileOpener.reveal(session.selectedURL ?? workspace.url)
+                } label: {
+                    Label {
+                        l10n("Show in Finder")
+                    } icon: {
+                        Image(systemName: "arrow.up.forward.app")
+                            .frame(width: 16, height: 16)
+                    }
+                }
+                .help(l10nString("Show in Finder"))
+                Button(action: onRefresh) {
+                    Label {
+                        l10n("Refresh")
+                    } icon: {
+                        Image(systemName: "arrow.clockwise")
+                            .frame(width: 16, height: 16)
+                    }
+                }
+                .help(l10nString("Refresh"))
+                // Toolbar adds 8pt; match the visible glyph to the card's 20pt inset.
+                .padding(.trailing, 7)
+            }
+        }
+    }
+
+    /// The pool stays mounted for the lifetime of the workspace detail view so
+    /// switching tabs (or to a binary file) never tears down the text views.
+    /// Passing optionals keeps this a single view identity; branching between
+    /// two CodePane values would recreate the coordinator and drop the pool.
+    private var codePane: some View {
+        CodePane(
+            tabID: textSelection?.tabID,
+            text: textSelection?.text,
+            documentID: textSelection?.documentID
+        )
+    }
+
+    private var textSelection: (tabID: String, text: String, documentID: String)? {
+        guard let tab = session.selectedTab,
+              case .text(let document) = tab.document.state,
+              !document.text.isEmpty else {
+            return nil
+        }
+        return (tab.id, document.text, tab.document.versionID)
+    }
+
+    /// True while a status/loading view covers the code pane. The pane stays
+    /// mounted to keep its pool, but stale text must not be focusable or
+    /// readable by assistive technologies.
+    private var hasOverlay: Bool {
+        textSelection == nil
     }
 
     @ViewBuilder
-    private var content: some View {
-        switch session.document.state {
-        case .empty:
-            StatusView(
-                icon: "doc.text",
-                message: l10n("Select a file to view")
-            )
-        case .loading:
-            ProgressView()
-                .controlSize(.small)
+    private var overlay: some View {
+        if session.tabs.isEmpty {
+            StatusView(icon: "doc.text", message: l10n("Select a file to view"))
+        } else if let tab = session.selectedTab {
+            switch tab.document.state {
+            case .empty:
+                StatusView(icon: "doc.text", message: l10n("Select a file to view"))
+            case .loading:
+                ZStack {
+                    Color(nsColor: .controlBackgroundColor)
+                    ProgressView()
+                        .controlSize(.small)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .text(let document):
-            if document.text.isEmpty {
-                StatusView(icon: "doc", message: l10n("This file is empty"))
-            } else {
-                CodeView(
-                    text: document.text,
-                    documentID: "\(session.document.url?.path ?? "")#\(session.document.revision)"
+            case .text(let document):
+                if document.text.isEmpty {
+                    StatusView(icon: "doc", message: l10n("This file is empty"))
+                }
+            case .binary:
+                StatusView(
+                    icon: "doc.zipper",
+                    message: l10n("Binary file"),
+                    detail: l10n("This file can't be displayed as text.")
+                )
+            case .tooLarge(let byteSize):
+                StatusView(
+                    icon: "doc",
+                    message: l10n("File too large"),
+                    detail: l10n(
+                        "This file is %@ and too large to display.",
+                        ByteCountFormatter.string(fromByteCount: byteSize, countStyle: .file)
+                    )
+                )
+            case .failed:
+                StatusView(
+                    icon: "exclamationmark.triangle",
+                    message: l10n("Couldn't read this file. It may have been moved or deleted.")
                 )
             }
-        case .binary:
-            StatusView(
-                icon: "doc.zipper",
-                message: l10n("Binary file"),
-                detail: l10n("This file can't be displayed as text.")
-            )
-        case .tooLarge(let byteSize):
-            StatusView(
-                icon: "doc",
-                message: l10n("File too large"),
-                detail: l10n(
-                    "This file is %@ and too large to display.",
-                    ByteCountFormatter.string(fromByteCount: byteSize, countStyle: .file)
-                )
-            )
-        case .failed:
-            StatusView(
-                icon: "exclamationmark.triangle",
-                message: l10n("Couldn't read this file. It may have been moved or deleted.")
-            )
         }
     }
 }
@@ -302,6 +345,7 @@ private struct StatusView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 }
 

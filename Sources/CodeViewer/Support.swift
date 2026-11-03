@@ -21,3 +21,26 @@ extension URL {
         return "~" + path.dropFirst(home.count)
     }
 }
+
+/// SF Symbol per file type, shared by the tree and the tab strip.
+enum FileIcon {
+    static func symbolName(for url: URL, isDirectory: Bool) -> String {
+        if isDirectory { return "folder" }
+        switch url.pathExtension.lowercased() {
+        case "json", "yaml", "yml", "toml", "plist", "xml", "entitlements", "xcconfig", "lock":
+            return "curlybraces"
+        case "md", "markdown", "txt", "rtf", "log":
+            return "doc.text"
+        case "png", "jpg", "jpeg", "gif", "svg", "webp", "heic", "tiff", "pdf":
+            return "photo"
+        case "swift", "js", "jsx", "ts", "tsx", "mjs", "cjs", "py", "rb", "go", "rs",
+             "c", "h", "cc", "cpp", "hpp", "m", "mm", "java", "kt", "kts", "cs", "php",
+             "sh", "zsh", "bash", "fish", "lua", "pl", "r", "sql", "html", "css",
+             "scss", "less", "vue", "svelte", "dart", "ex", "exs", "erl", "hs", "clj",
+             "scala":
+            return "chevron.left.forwardslash.chevron.right"
+        default:
+            return "doc"
+        }
+    }
+}

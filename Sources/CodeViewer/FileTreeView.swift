@@ -3,7 +3,8 @@ import SwiftUI
 /// Flattened tree rows for the selected workspace.
 struct FileTreeView: View {
     let tree: FileTreeStore
-    let document: DocumentStore
+    let selectedURL: URL?
+    let onOpen: (FileNode) -> Void
 
     var body: some View {
         Group {
@@ -22,7 +23,12 @@ struct FileTreeView: View {
                 ScrollView {
                     LazyVStack(spacing: 1) {
                         ForEach(tree.rows) { row in
-                            FileTreeRowView(row: row, tree: tree, document: document)
+                            FileTreeRowView(
+                                row: row,
+                                tree: tree,
+                                selectedURL: selectedURL,
+                                onOpen: onOpen
+                            )
                         }
                     }
                     .padding(.horizontal, 8)
@@ -51,12 +57,13 @@ struct FileTreeView: View {
 private struct FileTreeRowView: View {
     let row: FileTreeRow
     let tree: FileTreeStore
-    let document: DocumentStore
+    let selectedURL: URL?
+    let onOpen: (FileNode) -> Void
 
     @State private var isHovered = false
 
     private var isSelected: Bool {
-        !row.node.isDirectory && row.node.url == document.url
+        !row.node.isDirectory && row.node.url == selectedURL
     }
 
     private var isExpanded: Bool {
@@ -133,7 +140,7 @@ private struct FileTreeRowView: View {
     }
 
     private var icon: some View {
-        Image(systemName: symbolName)
+        Image(systemName: FileIcon.symbolName(for: row.node.url, isDirectory: row.node.isDirectory))
             .font(.system(size: 11))
             .foregroundStyle(isSelected ? Color.white : iconColor)
             .frame(width: 16)
@@ -143,31 +150,11 @@ private struct FileTreeRowView: View {
         row.node.isDirectory ? .accentColor : .secondary
     }
 
-    private var symbolName: String {
-        if row.node.isDirectory { return "folder" }
-        switch row.node.url.pathExtension.lowercased() {
-        case "json", "yaml", "yml", "toml", "plist", "xml", "entitlements", "xcconfig", "lock":
-            return "curlybraces"
-        case "md", "markdown", "txt", "rtf", "log":
-            return "doc.text"
-        case "png", "jpg", "jpeg", "gif", "svg", "webp", "heic", "tiff", "pdf":
-            return "photo"
-        case "swift", "js", "jsx", "ts", "tsx", "mjs", "cjs", "py", "rb", "go", "rs",
-             "c", "h", "cc", "cpp", "hpp", "m", "mm", "java", "kt", "kts", "cs", "php",
-             "sh", "zsh", "bash", "fish", "lua", "pl", "r", "sql", "html", "css",
-             "scss", "less", "vue", "svelte", "dart", "ex", "exs", "erl", "hs", "clj",
-             "scala":
-            return "chevron.left.forwardslash.chevron.right"
-        default:
-            return "doc"
-        }
-    }
-
     private func activate() {
         if row.node.isDirectory {
             Task { await tree.toggle(row.node) }
         } else {
-            document.open(row.node)
+            onOpen(row.node)
         }
     }
 }
@@ -179,10 +166,14 @@ private struct FileTreePreview: View {
     )
 
     var body: some View {
-        FileTreeView(tree: session.tree, document: session.document)
-            .frame(width: 260, height: 420)
-            .background(Color(nsColor: .windowBackgroundColor))
-            .task { await session.loadIfNeeded() }
+        FileTreeView(
+            tree: session.tree,
+            selectedURL: session.selectedURL,
+            onOpen: { session.open($0) }
+        )
+        .frame(width: 260, height: 420)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .task { await session.loadIfNeeded() }
     }
 }
 
