@@ -4,7 +4,7 @@
 /// literals.
 enum AppInfo {
     /// Display name shown in Finder, Dock and the menu bar.
-    static let displayName = "Code Viewer"
+    static let displayName = "CodeCtrl"
 
     /// Reverse-DNS bundle identifier; doubles as the preferences domain.
     static let bundleID = "org.bhwang.CodeViewer"

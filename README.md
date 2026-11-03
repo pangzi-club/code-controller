@@ -110,9 +110,9 @@ For the proper experience (Dock icon, menu bar, Cmd+Tab, double-clickable in
 Finder), assemble a universal app bundle:
 
 ```bash
-make app                    # build/CodeViewer.app (arm64 + x86_64)
-make launch                 # build/CodeViewer-Dev-<host arch>.app, opened
-make install                # universal build, then replace /Applications/CodeViewer.app
+make app                    # build/CodeCtrl.app (arm64 + x86_64)
+make launch                 # build/CodeCtrl-Dev-<host arch>.app, opened
+make install                # universal build, then replace /Applications/CodeCtrl.app
 ```
 
 `make-app.sh` builds a release bundle for the requested architectures: by
@@ -147,7 +147,7 @@ vice versa).
 ### App Store
 
 ```bash
-make mas                    # build/CodeViewer-0.1-1.pkg
+make mas                    # build/CodeCtrl-0.1-1.pkg
 ```
 
 `make mas` signs with Apple Distribution and writes a `.pkg` for Transporter.
