@@ -1,6 +1,6 @@
 # Template Maintenance
 
-Template version: 2026-11-02
+Template version: 2026-11-03
 
 This app started from **swiftui-starter**. The files below are owned by the
 template; app-specific code and configuration belong to this repository. When
@@ -46,6 +46,9 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
 
 ## Changelog
 
+- 2026-11-03 — packaging: `ARCHS=universal` is accepted for direct/dev builds
+  and produces a single lipo-merged `build/<Display Name>.app`; `make install`
+  now builds and installs that universal bundle instead of the host-arch one.
 - 2026-11-02 — packaging: `make app` emits one `.app` per architecture
   (`build/<Display Name>-<arch>.app`), `ARCHS` selects a subset, and
   `make launch` / `make install` build only the host architecture. The App

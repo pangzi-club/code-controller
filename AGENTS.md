@@ -26,8 +26,10 @@ instead of a developer's home path.
 - `make build` — release build
 - `make app` — assemble `build/<Display Name>-<arch>.app` for arm64 and x86_64
   (unsandboxed, Developer ID when the keychain has one, otherwise ad-hoc);
-  `ARCHS` selects a subset, e.g. `ARCHS=arm64 make app`
-- `make install` — assemble the host-arch bundle, then replace
+  `ARCHS` selects a subset, e.g. `ARCHS=arm64 make app`, or a single
+  lipo-merged bundle with `ARCHS=universal`
+- `make install` — assemble the universal bundle (`ARCHS=universal`, a single
+  lipo-merged `build/<Display Name>.app`), then replace
   `/Applications/<Display Name>.app` with it; quit the running copy first (see
   the code-signature `SIGKILL` gotcha below)
 - `make mas` — assemble the sandboxed universal App Store build and

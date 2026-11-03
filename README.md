@@ -38,7 +38,7 @@ swift test    # or: make test
 There is also a `Makefile` with npm-scripts style shortcuts: `make dev` (debug
 run), `make test`, `make check-l10n` (verify localization key parity),
 `make app` (assemble arm64 and x86_64 bundles), `make install` (assemble the
-host-arch bundle and replace the copy in /Applications), `make launch`
+universal bundle and replace the copy in /Applications), `make launch`
 (assemble and open the dev build), `make mas` (App Store package), `make build`,
 `make rename` (template rename), `make template-diff` (show template drift),
 `make clean`.
@@ -103,17 +103,20 @@ hand.
 ## Packaging as a .app
 
 For the proper experience (Dock icon, menu bar, Cmd+Tab, double-clickable in
-Finder), assemble app bundles — one per architecture:
+Finder), assemble app bundles — one per architecture, or a single universal one
+for /Applications:
 
 ```bash
 make app                    # build/DemoExplorer-arm64.app + build/DemoExplorer-x86_64.app
 make launch                 # build/DemoExplorer-Dev-<host arch>.app, opened
-make install                # host-arch build, then replace /Applications/DemoExplorer.app
+make install                # universal build, then replace /Applications/DemoExplorer.app
 ```
 
 `make-app.sh` builds a release bundle for each architecture — arm64 and x86_64
 by default, so Apple Silicon and Intel Macs each get a native app. Set `ARCHS`
-to build a subset, e.g. `ARCHS=arm64 ./Scripts/make-app.sh`. Each bundle gets
+to build a subset, e.g. `ARCHS=arm64 ./Scripts/make-app.sh`, or `ARCHS=universal`
+for a single lipo-merged bundle (`build/<Display Name>.app`, what `make install`
+uses). Each bundle gets
 the generated app icon (`Scripts/make-icon.swift` draws it programmatically),
 an Info.plist written from `AppInfo.swift` (display name, bundle ID, marketing
 version and build number) and `Package.swift` (minimum macOS), and a copy of

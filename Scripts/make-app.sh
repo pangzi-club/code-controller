@@ -14,11 +14,13 @@
 # Usage:
 #   ./Scripts/make-app.sh                  # Developer ID (or ad-hoc), arm64 + x86_64
 #   ARCHS="arm64" ./Scripts/make-app.sh    # build a subset of architectures
+#   ARCHS="universal" ./Scripts/make-app.sh # one lipo-merged universal bundle
 #   DEV=1 ./Scripts/make-app.sh            # local dev build: .dev bundle ID + "-Dev" name
 #   MAS=1 ./Scripts/make-app.sh            # App Store build + .pkg, sandboxed, universal
 #
 # Environment overrides:
-#   ARCHS                architectures for direct/dev builds (default "arm64 x86_64")
+#   ARCHS                architectures for direct/dev builds (default "arm64 x86_64";
+#                        "universal" builds one merged bundle and cannot be combined)
 #   SIGN_IDENTITY        signing identity (defaults to Developer ID Application
 #                        for a normal build, Apple Distribution for MAS=1)
 #   INSTALLER_IDENTITY   installer certificate for the MAS .pkg
@@ -48,10 +50,15 @@ else
     [[ ${#ARCH_LIST[@]} -gt 0 ]] || die "ARCHS is empty"
     for ARCH in "${ARCH_LIST[@]}"; do
         case "$ARCH" in
-            arm64|x86_64) ;;
-            *) die "unsupported architecture '$ARCH' (expected arm64 or x86_64)" ;;
+            arm64|x86_64|universal) ;;
+            *) die "unsupported architecture '$ARCH' (expected arm64, x86_64 or universal)" ;;
         esac
     done
+    if [[ ${#ARCH_LIST[@]} -gt 1 ]]; then
+        for ARCH in "${ARCH_LIST[@]}"; do
+            [[ "$ARCH" != "universal" ]] || die "ARCHS=universal cannot be combined with other architectures"
+        done
+    fi
 fi
 
 # --- Target/binary name and minimum OS: ask SwiftPM --------------------------

@@ -7,6 +7,7 @@ APPINFO := $(firstword $(wildcard Sources/*/AppInfo.swift))
 APP_DISPLAY_NAME := $(shell sed -nE 's/^[[:space:]]*static let displayName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' $(APPINFO))
 HOST_ARCH := $(shell uname -m)
 APP_PATH := build/$(APP_DISPLAY_NAME)-$(HOST_ARCH).app
+UNIVERSAL_APP_PATH := build/$(APP_DISPLAY_NAME).app
 DEV_APP_PATH := build/$(APP_DISPLAY_NAME)-Dev-$(HOST_ARCH).app
 
 .DEFAULT_GOAL := help
@@ -29,10 +30,10 @@ check-l10n: ## Verify Localizable.strings key parity across languages
 app: ## Assemble arm64 and x86_64 .app bundles (Developer ID or ad-hoc)
 	./Scripts/make-app.sh
 
-install: ## Assemble the host-arch .app and install it into /Applications
-	ARCHS="$(HOST_ARCH)" ./Scripts/make-app.sh
+install: ## Assemble the universal .app and install it into /Applications
+	ARCHS=universal ./Scripts/make-app.sh
 	rm -rf "/Applications/$(APP_DISPLAY_NAME).app"
-	ditto "$(APP_PATH)" "/Applications/$(APP_DISPLAY_NAME).app"
+	ditto "$(UNIVERSAL_APP_PATH)" "/Applications/$(APP_DISPLAY_NAME).app"
 
 mas: ## Assemble the universal App Store build and .pkg (Apple Distribution)
 	MAS=1 ./Scripts/make-app.sh
