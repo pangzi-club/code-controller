@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// Horizontal tab strip for the open documents of one workspace.
+/// Horizontal tab strip for the open documents of one workspace. Tabs flow
+/// into a second row when one row cannot fit them; beyond two rows the tabs
+/// stop shrinking and the strip scrolls horizontally instead.
 struct DocumentTabBar: View {
     let tabs: [DocumentTab]
     let selectedTabID: DocumentTab.ID?
@@ -8,21 +10,30 @@ struct DocumentTabBar: View {
     let onClose: (DocumentTab) -> Void
 
     @State private var hoveredTabID: DocumentTab.ID?
+    @State private var viewportWidth: CGFloat = 0
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) {
+                TabRowsLayout(containerWidth: availableRowWidth) {
                     ForEach(tabs) { tab in
                         tabView(tab)
                             .id(tab.id)
                     }
                 }
-                .padding(.horizontal, 8)
-                .frame(height: 46)
+                .padding(.horizontal, Self.horizontalPadding)
+                .padding(.vertical, Self.verticalPadding)
                 .background(TabVerticalScrollLock())
             }
             .scrollBounceBehavior(.basedOnSize)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: TabViewportWidthKey.self,
+                        value: geometry.size.width
+                    )
+                }
+            )
             .onChange(of: selectedTabID) { _, id in
                 guard let id else { return }
                 withAnimation(.easeOut(duration: 0.15)) {
@@ -30,11 +41,21 @@ struct DocumentTabBar: View {
                 }
             }
         }
-        .frame(height: 46)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .onPreferenceChange(TabViewportWidthKey.self) { width in
+            viewportWidth = width
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) {
             Divider()
         }
+    }
+
+    private static let horizontalPadding: CGFloat = 8
+    private static let verticalPadding: CGFloat = 4
+
+    private var availableRowWidth: CGFloat {
+        guard viewportWidth > 0 else { return .infinity }
+        return max(1, viewportWidth - Self.horizontalPadding * 2)
     }
 
     private func tabView(_ tab: DocumentTab) -> some View {
@@ -53,10 +74,8 @@ struct DocumentTabBar: View {
                     Text(tab.name)
                         .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
+                        .lineLimit(1)
                         .truncationMode(.middle)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(minWidth: 80, maxWidth: 200, alignment: .leading)
                 .contentShape(Rectangle())
@@ -84,7 +103,6 @@ struct DocumentTabBar: View {
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .padding(.vertical, 4)
         .frame(height: 38)
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -112,8 +130,104 @@ struct DocumentTabBar: View {
     }
 }
 
-/// SwiftUI lays the tab strip's document view out 52pt taller than the 46pt
-/// strip (the titlebar's safe area leaks into it). That leftover vertical
+private struct TabViewportWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+/// Flow layout capped at two rows. Tabs keep their ideal width while the
+/// strip has room; once more than two rows would be needed, all tabs share
+/// the width that fits two rows (down to their 80pt minimum), and the strip
+/// scrolls horizontally for whatever still does not fit.
+private struct TabRowsLayout: Layout {
+    let containerWidth: CGFloat
+    var spacing: CGFloat = 2
+    var rowSpacing: CGFloat = 4
+
+    static let tabHeight: CGFloat = 38
+
+    struct Plan {
+        var widths: [CGFloat]
+        var rows: [Range<Int>]
+        var size: CGSize
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        plan(for: subviews).size
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let plan = plan(for: subviews)
+        var y = bounds.minY
+        for row in plan.rows {
+            var x = bounds.minX
+            for index in row {
+                let width = plan.widths[index]
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(width: width, height: Self.tabHeight)
+                )
+                x += width + spacing
+            }
+            y += Self.tabHeight + rowSpacing
+        }
+    }
+
+    private func plan(for subviews: Subviews) -> Plan {
+        var widths = subviews.map { $0.sizeThatFits(.unspecified).width }
+        var rowRanges = wrappedRows(widths: widths, containerWidth: containerWidth)
+
+        if rowRanges.count > 2 {
+            let perRow = (widths.count + 1) / 2
+            let available = containerWidth - spacing * CGFloat(perRow - 1)
+            let uniform = max(80, min(200, available / CGFloat(perRow)))
+            widths = Array(repeating: uniform, count: widths.count)
+            rowRanges = [0..<perRow, perRow..<widths.count].filter { !$0.isEmpty }
+        }
+
+        let rowWidths = rowRanges.map { row in
+            row.reduce(0) { $0 + widths[$1] } + spacing * CGFloat(max(0, row.count - 1))
+        }
+        let width = rowWidths.max() ?? 0
+        let height = CGFloat(rowRanges.count) * Self.tabHeight
+            + CGFloat(max(0, rowRanges.count - 1)) * rowSpacing
+
+        return Plan(widths: widths, rows: rowRanges, size: CGSize(width: width, height: height))
+    }
+
+    private func wrappedRows(widths: [CGFloat], containerWidth: CGFloat) -> [Range<Int>] {
+        var rows: [Range<Int>] = []
+        var start = 0
+        var x: CGFloat = 0
+
+        for index in widths.indices {
+            let needed = index == start ? widths[index] : x + spacing + widths[index]
+            if index > start && needed > containerWidth {
+                rows.append(start..<index)
+                start = index
+                x = widths[index]
+            } else {
+                x = needed
+            }
+        }
+        if !widths.isEmpty {
+            rows.append(start..<widths.count)
+        }
+        return rows
+    }
+}
+
+/// SwiftUI lays the tab strip's document view out 52pt taller than the strip
+/// itself (the titlebar's safe area leaks into it). That leftover vertical
 /// range lets a two-finger scroll push the tabs out of view, and they stay
 /// out because the overscroll is a real offset, not a bounce. The strip is
 /// horizontal-only, so pin the clip view to y = 0 and drop vertical bounce.

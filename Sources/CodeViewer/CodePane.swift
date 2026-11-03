@@ -93,6 +93,10 @@ struct CodePane: NSViewRepresentable {
             entry.scrollView.autoresizingMask = [.width, .height]
             container.addSubview(entry.scrollView)
             currentTabID = tabID
+            // Re-tile once the scroll view has a real frame: the ruler was
+            // attached before the view was mounted, and a stale layout leaves
+            // the clip view full-width so the ruler covers the first glyphs.
+            entry.scrollView.tile()
 
             if let saved = savedStates[tabID] {
                 restore(saved, in: entry)
@@ -118,10 +122,14 @@ struct CodePane: NSViewRepresentable {
 
             let clipView = entry.scrollView.contentView
             let contentSize = entry.scrollView.documentView?.frame.size ?? .zero
-            let maxX = max(0, contentSize.width - clipView.bounds.width)
+            // The ruler is an overlay: AppKit parks the clip view at
+            // -ruleThickness so the document starts to its right. Clamping x
+            // to 0 slides the first characters back under the ruler.
+            let minX = -(entry.scrollView.verticalRulerView?.ruleThickness ?? 0)
+            let maxX = max(minX, contentSize.width - clipView.bounds.width)
             let maxY = max(0, contentSize.height - clipView.bounds.height)
             let origin = NSPoint(
-                x: min(max(0, state.scrollOrigin.x), maxX),
+                x: min(max(minX, state.scrollOrigin.x), maxX),
                 y: min(max(0, state.scrollOrigin.y), maxY)
             )
             clipView.scroll(to: origin)

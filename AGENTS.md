@@ -173,7 +173,10 @@ instead of a developer's home path.
   `CodeTextFactory.lineHeight` is pinned through `minimumLineHeight` /
   `maximumLineHeight`, and the ruler derives visible lines from the scroll
   offset instead of querying TextKit layout. If the editor font or spacing
-  changes, update that one constant.
+  changes, update that one constant. The ruler is an overlay on the clip
+  view: AppKit parks the clip at `-ruleThickness` so the document starts to
+  its right. Scroll restores must keep that minimum when clamping x — clamping
+  to 0 slides the first characters under the ruler.
 - SwiftUI window restoration keys the saved frame by the scene's explicit id,
   or by its content type when no id is given: the main `Window("", id: "main")`
   saves as `NSWindow Frame main` in the app's UserDefaults (the old
