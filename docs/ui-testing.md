@@ -148,9 +148,10 @@ after the first visible window; a window-size flash is easy to miss live.
 
 Case note: the window frame is restored by SwiftUI/NSWindow before the window
 is displayed. A default-size frame followed by a jump means the autosave key
-changed — the scene content type must keep a stable name (keep top-level
-wrappers non-private; a `private` type mangles to a per-launch address). The
-first visible frame should already be the saved size.
+changed — the scene's id (or its content type, for scenes without one) must
+stay stable. Keep top-level scene wrappers non-private: a `private` type
+mangles to a per-launch address. The first visible frame should already be the
+saved size.
 
 ## Settings window, focus ring and window state
 
@@ -170,11 +171,16 @@ first visible frame should already be the saved size.
 6. Enter full screen: neither the native toolbar nor an inline replacement may
    appear, and there must be no glass band or clipped sidebar header. Exit full
    screen and confirm that the native toolbar and titlebar treatment return.
-7. Close every window (⌘W; confirm with `axfind "AXWindow"`), then click the
-   Dock icon: the main window must come back. Minimize it (⌘M) and click the
-   Dock icon instead — the same window must deminiaturize, never a second one.
-   The reopen path lives in `AppDelegate.applicationShouldHandleReopen`; a
-   stock SwiftUI `WindowGroup` opens nothing on its own.
+7. Close every window (⌘W; confirm with `axfind "AXWindow"`) and confirm the
+   app stays running. Then click the Dock icon: exactly one main window must
+   come back — for a single click, a fast double click, and while the app is
+   already frontmost. With a window open, a Dock click must only bring it
+   forward. Minimize it (⌘M) and click the Dock icon instead — the same window
+   must deminiaturize, never a second one. Test with a real Dock icon click;
+   `open -b` sends no reopen event while the app is frontmost.
+   The reopen path lives in `AppDelegate.applicationShouldHandleReopen`; the
+   default system handling restores the window, and the `Window` scene
+   guarantees `openWindow` can never create a duplicate.
 
 ## Appearance and localization
 
@@ -284,8 +290,9 @@ its domain and container under `~/Library/Containers/<bundleID>/Data`;
 | `language` | `en`, `zh-Hans`, or absent for Follow System |
 
 Window frames are not an app key: SwiftUI stores them under the scene's frame
-autosave name, `NSWindow Frame main-AppWindow-1` for the main
-`WindowGroup(id: "main")`.
+autosave name, `NSWindow Frame main` for the main `Window("", id: "main")`.
+This works in the `.dev` bundle too, but in its own
+`<bundleID>.dev` preferences domain.
 
 ```sh
 defaults delete "$APP_BUNDLE_ID"            # clean slate

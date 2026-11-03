@@ -162,20 +162,29 @@ instead of a developer's home path.
   focus ring that SwiftUI cannot clear; the custom button must not introduce
   a new one. Apply the removal to the sidebar column's content — placing it
   on the split view or the detail column leaves the system toggle visible.
-- SwiftUI window restoration keys the saved frame by the scene's content
-  type, or by its explicit id when one is given: the main
-  `WindowGroup(id: "main")` saves as
-  `NSWindow Frame main-AppWindow-1`. Keep every top-level scene wrapper
+- SwiftUI window restoration keys the saved frame by the scene's explicit id,
+  or by its content type when no id is given: the main `Window("", id: "main")`
+  saves as `NSWindow Frame main` in the app's UserDefaults (the old
+  `WindowGroup(id:)` scene keyed by content type, whose mangled name could
+  contain a per-launch runtime address). Keep every top-level scene wrapper
   non-private: a private type mangles to a name containing a runtime address,
   so the autosave key changes every launch and the frame is never restored.
-  Changing the scene id also abandons the saved frame once.
-- SwiftUI does **not** recreate the window of a closed `WindowGroup` when the
-  Dock icon is clicked: the reopen arrives as
-  `applicationShouldHandleReopen` and the app activates with no UI. The
-  `AppDelegate` adaptor in `DemoExplorerApp.swift` opens one instead; the
-  root view hands it the environment's `openWindow` action from `.onAppear`,
-  because that action is the only API that can open a `WindowGroup` window and
-  is reachable only from inside a scene.
+  Changing the scene type or id also abandons the saved frame once.
+- On macOS 14/15 the default `applicationShouldHandleReopen` handling re-shows
+  a closed window on its own, and `openWindow(id:)` on a `WindowGroup` always
+  creates a *new* instance — combining them produced two windows per Dock
+  click. The main scene is therefore a `Window("", id: "main")`, a single
+  unique instance: the system restore and the environment's `openWindow`
+  action both resolve to the same window, so the race is structural, not
+  timing-based. The `AppDelegate` adaptor in `DemoExplorerApp.swift` returns
+  `true` to let the system restore, and only after a 0.6 s single-flight delay
+  (which absorbs the second event of a double click) calls `openWindow` when
+  no visible main window exists — that fallback only fires on older systems.
+  The root view hands `openWindow` to the delegate from `.onAppear`, because
+  the action is reachable only from inside a scene. A fork that genuinely
+  needs multiple windows must instead reuse an existing window in the reopen
+  handler (`makeKeyAndOrderFront`) and never create one; do not go back to
+  `WindowGroup` for the main scene.
 - Test frame restoration on the assembled `.app` (`make launch` / `make app`).
   An unbundled `swift run` binary has no bundle identity for system
   restoration, so it does not provide a meaningful frame-persistence check.
