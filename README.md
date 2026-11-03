@@ -12,11 +12,11 @@ out of the box.
 - **Workspaces sidebar**: add folders from the workspace menu or by dragging them in; each gets a stable color tile derived from its path. The sidebar hosts a Files/Graph pane switch, uses the native translucent material, and extends under the transparent titlebar to the traffic lights.
 - **File tree**: lazily loaded recursive tree (directories first, then by name) with hover highlighting, context menus (Open, Show Git Diff, Show in Finder) and per-row git status badges.
 - **Document tabs**: one tab per file with middle-truncating titles, two-row wrapping, a close button and the same git status badge. ⌘W closes the selected tab (does nothing with no tabs open, so it never takes the window down); ⌘1…⌘9 switch tabs. Views are pooled in an LRU (8 entries) so switching tabs preserves scroll position and selection.
-- **Syntax highlighting**: highlight.js (via HighlighterSwift) running on a background actor, with a `SyntaxHighlighter` protocol seam for future engines. Finished results cache per document version and theme (LRU, 12 entries); the styled output is re-pinned to the fixed mono font and line height so the line-number ruler never shifts; colors follow the system light/dark appearance.
+- **Syntax highlighting**: highlight.js (via HighlighterSwift) running on a background actor, with a `SyntaxHighlighter` protocol seam for future engines. Finished results cache per document version, theme and editor font (LRU, 12 entries); the styled output is re-pinned to the editor font and pinned line height so the line-number ruler never shifts; the theme follows the system light/dark appearance, or a user-picked editor theme (13 curated highlight.js themes, rendered on their own background).
 - **Git integration**: repository detection at the workspace root with graceful degradation when git is missing; `git status` badges (M/A/D/?) on tree rows and tabs; read-only diff sheets for files (working tree vs HEAD) and whole commits (⌘R refreshes tree, statuses, commits and the selected document).
 - **Commit history**: a Graph pane in the sidebar listing recent commits — subject, author, relative date, branch badge — click one to open its full diff.
 - **Live refresh**: FSEvents watch per workspace with debounced bursts; the tree, git statuses and changed open documents refresh automatically. Unchanged documents are skipped via mtime/size checks so highlight caches survive unrelated churn.
-- **Settings window**: system/light/dark theme picker and an interface language picker (system/English/简体中文), persisted and applied app-wide — a separate fixed-size window opened with ⌘, from the App menu.
+- **Settings window**: a sidebar with four panes — General (interface language), Appearance (system/light/dark theme), Editor (highlight theme with a live preview, editor font family and size) and Shortcuts (a reference list of the fixed keyboard shortcuts) — persisted and applied app-wide; a separate fixed-size window opened with ⌘, from the App menu.
 - **Persistence**: the workspace list is stored as security-scoped bookmarks in UserDefaults (so the sandboxed App Store build keeps access across relaunches; stale folders are dropped), and the system restores the window frame across relaunches.
 - **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
 - **Diagnostics**: structured unified logging mirrored to a rotating file log, with a launch banner that records the bundle, sandbox and log paths.
@@ -188,8 +188,9 @@ Sources/
 │   ├── Log.swift                 # Unified logging + rotating file log
 │   ├── PreviewFixtures.swift     # DEBUG-only sample folder for Xcode Previews
 │   ├── L10n.swift                # Localization helpers
-│   ├── SettingsStore.swift       # Theme + language preferences and persistence
-│   ├── SettingsView.swift        # Settings window content (theme + language pickers)
+│   ├── SettingsStore.swift       # Theme, language, editor theme/font prefs and persistence
+│   ├── SettingsView.swift        # Settings window: General/Appearance/Editor/Shortcuts panes
+│   ├── EditorFont.swift          # Editor font setting: family + size, metrics and mono-family list
 │   └── Resources/
 │       ├── en.lproj/Localizable.strings
 │       ├── zh-Hans.lproj/Localizable.strings

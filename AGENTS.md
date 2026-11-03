@@ -170,13 +170,17 @@ instead of a developer's home path.
   the clip view to y = 0 and sets `verticalScrollElasticity = .none`. Do not
   remove it; horizontal scrolling and `ScrollViewReader.scrollTo` still work.
 - The code pane's line-number ruler assumes one fixed line height:
-  `CodeTextFactory.lineHeight` is pinned through `minimumLineHeight` /
+  `EditorFont.lineHeight` is pinned through `minimumLineHeight` /
   `maximumLineHeight`, and the ruler derives visible lines from the scroll
-  offset instead of querying TextKit layout. If the editor font or spacing
-  changes, update that one constant. `CodeEditorView` pins the ruler as a
-  separate view to the scroll view's leading edge; do not attach it as an
-  `NSRulerView` overlay. The code clip view therefore keeps a zero minimum
-  scroll origin, and the two views cannot draw into the tab bar above them.
+  offset instead of querying TextKit layout. The metric comes from the
+  settings' editor font (an `NSLayoutManager` query — main thread only, so
+  every restyling path runs on the main actor). When the user changes font
+  family or size, `CodeEditorView.applyFont` re-pins the paragraph style and
+  the ruler together, and the `HighlightCache` key includes the font id.
+  `CodeEditorView` pins the ruler as a separate view to the scroll view's
+  leading edge; do not attach it as an `NSRulerView` overlay. The code clip
+  view therefore keeps a zero minimum scroll origin, and the two views cannot
+  draw into the tab bar above them.
 - `make-app.sh` must copy **every** SwiftPM resource bundle from the products
   directory into `Contents/Resources` — the library's own and one per
   dependency (`Highlighter_Highlighter` for the syntax highlighter). A
@@ -189,10 +193,13 @@ instead of a developer's home path.
   style: one engine per actor, theme loads serialized). `CodeTextFactory.
   styled` must re-pin font and paragraph style over any highlighter output
   (colors may be themed, metrics may not — the ruler contract above).
-  Finished results cache per document version + theme in `HighlightCache`;
-  `DocumentStore.reloadIfChanged` (mtime + size) is what keeps watcher
-  bursts from invalidating that cache, so do not replace plain `reload()`
-  with it on the watcher path.
+  Finished results cache per document version + theme + editor font in
+  `HighlightCache`; the automatic appearance-following themes keep the system
+  control background, while a user-picked editor theme adopts its own
+  background (`HighlightTheme.usesThemeBackground`). `DocumentStore.
+  reloadIfChanged` (mtime + size) is what keeps watcher bursts from
+  invalidating that cache, so do not replace plain `reload()` with it on the
+  watcher path.
 - `git log --pretty=format:` interleaves a bare newline **between** records
   (separator semantics, unlike `tformat:`), so every parsed commit record
   after the first starts with `\n`; strip it or the hash is polluted and

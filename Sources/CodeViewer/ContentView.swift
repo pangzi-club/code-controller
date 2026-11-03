@@ -184,6 +184,7 @@ public struct ContentView: View {
 
 private struct WorkspaceDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var settings: SettingsStore
     let workspace: Workspace
     let session: WorkspaceSession
     /// Room for the traffic lights when the sidebar is collapsed and the
@@ -277,7 +278,8 @@ private struct WorkspaceDetailView: View {
             text: textSelection?.text,
             documentID: textSelection?.documentID,
             language: textSelection?.language,
-            theme: HighlightTheme(colorScheme: colorScheme)
+            theme: settings.resolvedHighlightTheme(for: colorScheme),
+            font: settings.editorFont
         )
     }
 

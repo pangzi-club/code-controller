@@ -8,6 +8,19 @@ final class LineNumberRulerView: NSView {
 
     var onWidthChange: ((CGFloat) -> Void)?
 
+    /// The editor font's pinned line height (see `EditorFont.lineHeight`):
+    /// visible lines derive from the scroll offset without laying out the
+    /// document, so this must match the attributed text's paragraph style.
+    var lineHeight: CGFloat {
+        didSet { needsDisplay = true }
+    }
+
+    /// Fill color behind the numbers; themed code panes pass their theme
+    /// background, the stock look keeps the system control background.
+    var backgroundColor: NSColor = .controlBackgroundColor {
+        didSet { needsDisplay = true }
+    }
+
     private weak var textView: NSTextView?
     private weak var scrollView: NSScrollView?
     private var lineCount = 1
@@ -16,9 +29,10 @@ final class LineNumberRulerView: NSView {
     private static let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
     private let horizontalPadding: CGFloat = 8
 
-    init(textView: NSTextView, scrollView: NSScrollView) {
+    init(textView: NSTextView, scrollView: NSScrollView, lineHeight: CGFloat) {
         self.textView = textView
         self.scrollView = scrollView
+        self.lineHeight = lineHeight
         super.init(frame: .zero)
 
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -61,7 +75,7 @@ final class LineNumberRulerView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.controlBackgroundColor.setFill()
+        backgroundColor.setFill()
         dirtyRect.fill()
 
         NSColor.separatorColor.setStroke()
@@ -75,13 +89,13 @@ final class LineNumberRulerView: NSView {
 
         let visibleRect = scrollView.contentView.bounds
         let inset = textView.textContainerInset.height
-        let lineHeight = CodeTextFactory.lineHeight
+        let lineHeight = self.lineHeight
         let firstLine = max(0, Int(floor((visibleRect.minY - inset) / lineHeight)))
         let lastLine = min(lineCount - 1, Int(ceil((visibleRect.maxY - inset) / lineHeight)))
         guard firstLine <= lastLine else { return }
 
         let textViewOrigin = convert(NSPoint.zero, from: textView)
-        let numberHeight = CodeTextFactory.lineHeight(for: Self.numberFont)
+        let numberHeight = EditorFont.lineHeight(for: Self.numberFont)
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .right
         let attributes: [NSAttributedString.Key: Any] = [

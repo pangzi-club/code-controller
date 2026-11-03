@@ -2,13 +2,16 @@ import SwiftUI
 import Testing
 @testable import CodeViewer
 
-// Serialized: the tests share the `theme` and `language` UserDefaults keys.
+// Serialized: the tests share the theme, editor, and language UserDefaults keys.
 @Suite(.serialized)
 @MainActor
 struct SettingsStoreTests {
     private func cleanUp() {
         UserDefaults.standard.removeObject(forKey: "theme")
         UserDefaults.standard.removeObject(forKey: LanguagePreference.defaultsKey)
+        UserDefaults.standard.removeObject(forKey: EditorThemeOption.defaultsKey)
+        UserDefaults.standard.removeObject(forKey: "editorFontName")
+        UserDefaults.standard.removeObject(forKey: "editorFontSize")
     }
 
     @Test("theme falls back to system when nothing (or garbage) is stored")
@@ -72,5 +75,94 @@ struct SettingsStoreTests {
         for language in LanguagePreference.allCases {
             #expect(LanguagePreference(rawValue: language.rawValue) == language)
         }
+    }
+
+    @Test("editor theme falls back to automatic when nothing (or garbage) is stored")
+    func editorThemeFallback() {
+        cleanUp()
+        #expect(SettingsStore().editorTheme == .automatic)
+
+        UserDefaults.standard.set("solarized", forKey: EditorThemeOption.defaultsKey)
+        defer { cleanUp() }
+        #expect(SettingsStore().editorTheme == .automatic)
+    }
+
+    @Test("setting an editor theme persists it for the next launch")
+    func editorThemePersists() {
+        cleanUp()
+        defer { cleanUp() }
+
+        SettingsStore().editorTheme = .dracula
+
+        #expect(UserDefaults.standard.string(forKey: EditorThemeOption.defaultsKey) == "dracula")
+        #expect(SettingsStore().editorTheme == .dracula)
+    }
+
+    @Test("every editor theme round-trips through its raw value")
+    func editorThemeRawValueRoundTrip() {
+        for option in EditorThemeOption.allCases {
+            #expect(EditorThemeOption(rawValue: option.rawValue) == option)
+        }
+    }
+
+    @Test("automatic resolves per appearance; a picked theme ignores it")
+    func resolvedHighlightTheme() {
+        cleanUp()
+        defer { cleanUp() }
+
+        let store = SettingsStore()
+        #expect(store.resolvedHighlightTheme(for: .light) == HighlightTheme.light)
+        #expect(store.resolvedHighlightTheme(for: .dark) == HighlightTheme.dark)
+        // The appearance-following pair keeps the stock system background.
+        #expect(HighlightTheme.light.usesThemeBackground == false)
+        #expect(HighlightTheme.dark.usesThemeBackground == false)
+
+        store.editorTheme = .dracula
+        #expect(store.resolvedHighlightTheme(for: .light) == HighlightTheme(name: "dracula"))
+        #expect(store.resolvedHighlightTheme(for: .dark) == HighlightTheme(name: "dracula"))
+        // User-picked themes render on their own background.
+        #expect(store.resolvedHighlightTheme(for: .dark).usesThemeBackground == true)
+    }
+
+    @Test("editor font settings resolve into an EditorFont with a clamped size")
+    func editorFontResolution() {
+        cleanUp()
+        defer { cleanUp() }
+
+        let store = SettingsStore()
+        #expect(store.editorFont == EditorFont.default)
+
+        store.editorFontSize = 42
+        #expect(store.editorFont.size == EditorFont.sizeRange.upperBound)
+        store.editorFontSize = 2
+        #expect(store.editorFont.size == EditorFont.sizeRange.lowerBound)
+
+        store.editorFontName = "Menlo"
+        #expect(
+            store.editorFont
+                == EditorFont(fontName: "Menlo", size: EditorFont.sizeRange.lowerBound)
+        )
+        #expect(UserDefaults.standard.string(forKey: "editorFontName") == "Menlo")
+    }
+
+    @Test("out-of-range stored font sizes clamp on load")
+    func editorFontSizeClampsOnLoad() {
+        cleanUp()
+        UserDefaults.standard.set(42.0, forKey: "editorFontSize")
+        defer { cleanUp() }
+        #expect(SettingsStore().editorFontSize == Double(EditorFont.sizeRange.upperBound))
+    }
+
+    @Test("editor font settings persist for the next launch")
+    func editorFontPersists() {
+        cleanUp()
+        defer { cleanUp() }
+
+        let store = SettingsStore()
+        store.editorFontName = "Menlo"
+        store.editorFontSize = 15
+
+        let relaunched = SettingsStore()
+        #expect(relaunched.editorFont == EditorFont(fontName: "Menlo", size: 15))
     }
 }

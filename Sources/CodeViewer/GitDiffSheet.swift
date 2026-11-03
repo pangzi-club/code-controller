@@ -42,12 +42,13 @@ struct GitDiffSheet: View {
 
     private enum Content {
         case loading
-        case text(NSAttributedString)
+        case text(NSAttributedString, NSColor?)
         case empty
     }
 
     @State private var content: Content = .loading
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: SettingsStore
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,8 +61,8 @@ struct GitDiffSheet: View {
                         .controlSize(.small)
                 case .empty:
                     emptyState
-                case .text(let attributed):
-                    DiffTextView(attributed: attributed)
+                case .text(let attributed, let background):
+                    DiffTextView(attributed: attributed, background: background)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -71,7 +72,10 @@ struct GitDiffSheet: View {
         // the sheet identity survives must reload from scratch.
         .task(id: request.id) {
             content = .loading
-            await load()
+            // Capture on the main actor; `load` runs its continuation off it.
+            let theme = settings.resolvedHighlightTheme(for: colorScheme)
+            let font = settings.editorFont
+            await load(theme: theme, font: font)
         }
     }
 
@@ -113,7 +117,11 @@ struct GitDiffSheet: View {
         }
     }
 
-    private func load() async {
+    /// Runs on the main actor: `EditorFont.lineHeight` goes through an
+    /// NSLayoutManager, and `CodeTextFactory.styled` reads it while merging
+    /// the highlighter's output.
+    @MainActor
+    private func load(theme: HighlightTheme, font: EditorFont) async {
         guard let root else {
             content = .empty
             return
@@ -135,12 +143,16 @@ struct GitDiffSheet: View {
             requestKey: request.id,
             text: text,
             language: "diff",
-            theme: HighlightTheme(colorScheme: colorScheme)
+            theme: theme
         ) {
-            content = .text(CodeTextFactory.styled(highlighted.attributed))
+            // User-picked themes render on their own background; the
+            // appearance-following defaults keep the system one.
+            let background = theme.usesThemeBackground ? highlighted.background : nil
+            content = .text(CodeTextFactory.styled(highlighted.attributed, font: font), background)
         } else {
             content = .text(
-                NSAttributedString(string: text, attributes: CodeTextFactory.attributes())
+                NSAttributedString(string: text, attributes: CodeTextFactory.attributes(font)),
+                nil
             )
         }
     }
@@ -150,19 +162,29 @@ struct GitDiffSheet: View {
 /// editor (fixed line height + line-number ruler).
 private struct DiffTextView: NSViewRepresentable {
     let attributed: NSAttributedString
+    let background: NSColor?
+
+    @EnvironmentObject private var settings: SettingsStore
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
     func makeNSView(context: Context) -> CodeEditorView {
-        let editor = CodeEditorView()
+        let editor = CodeEditorView(font: settings.editorFont)
+        editor.setBackground(background)
         editor.setAttributedText(attributed)
         context.coordinator.textHash = attributed.hashValue
+        context.coordinator.fontID = settings.editorFont.id
         return editor
     }
 
     func updateNSView(_ editor: CodeEditorView, context: Context) {
+        let fontID = settings.editorFont.id
+        if context.coordinator.fontID != fontID {
+            context.coordinator.fontID = fontID
+            editor.applyFont(settings.editorFont)
+        }
         guard context.coordinator.textHash != attributed.hashValue else { return }
         context.coordinator.textHash = attributed.hashValue
         editor.setAttributedText(attributed)
@@ -170,5 +192,6 @@ private struct DiffTextView: NSViewRepresentable {
 
     final class Coordinator {
         var textHash: Int?
+        var fontID: String?
     }
 }

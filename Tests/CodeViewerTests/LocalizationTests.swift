@@ -40,6 +40,8 @@ struct LocalizationTests {
         let keys = Set(
             ThemePreference.allCases.map(\.labelKey)
                 + LanguagePreference.allCases.map(\.labelKey)
+                + EditorThemeOption.allCases.map(\.labelKey)
+                + SettingsPane.allCases.map(\.labelKey)
         )
 
         for key in keys {

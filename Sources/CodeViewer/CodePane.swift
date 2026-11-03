@@ -17,6 +17,7 @@ struct CodePane: NSViewRepresentable {
     /// render plain text.
     let language: String?
     let theme: HighlightTheme
+    var font: EditorFont = .default
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -35,7 +36,8 @@ struct CodePane: NSViewRepresentable {
             text: text,
             documentID: documentID,
             language: language,
-            theme: theme
+            theme: theme,
+            font: font
         )
     }
 
@@ -51,9 +53,10 @@ struct CodePane: NSViewRepresentable {
             var lastUsed: Int
             var text: String
             var language: String?
-            /// Theme the editor's current paint was made for; nil means the
-            /// content is stale and needs (re)painting.
+            /// Theme and font the editor's current paint was made for; nil
+            /// means the content is stale and needs (re)painting.
             var appliedTheme: HighlightTheme?
+            var appliedFont: EditorFont?
             var highlightTask: Task<Void, Never>?
         }
 
@@ -66,6 +69,7 @@ struct CodePane: NSViewRepresentable {
         private var savedStates: [String: SavedState] = [:]
         private var currentTabID: String?
         private var currentTheme = HighlightTheme.light
+        private var currentFont = EditorFont.default
         private var clock = 0
         private let cache = HighlightCache()
         private let service = HighlightService.shared
@@ -75,31 +79,36 @@ struct CodePane: NSViewRepresentable {
             text: String?,
             documentID: String?,
             language: String?,
-            theme: HighlightTheme
+            theme: HighlightTheme,
+            font: EditorFont
         ) {
             guard let container, let tabID, let text, let documentID else { return }
             clock += 1
 
             let themeChanged = theme != currentTheme
-            if themeChanged {
+            let fontChanged = font != currentFont
+            if themeChanged || fontChanged {
                 currentTheme = theme
+                currentFont = font
                 // Hidden editors keep their old paint; mark everything stale
                 // so each one repaints below or on its next update.
                 entries = entries.mapValues { entry in
                     var entry = entry
                     entry.appliedTheme = nil
+                    entry.appliedFont = nil
                     return entry
                 }
             }
 
             if entries[tabID] == nil {
                 entries[tabID] = Entry(
-                    editorView: CodeEditorView(),
+                    editorView: CodeEditorView(font: font),
                     documentID: documentID,
                     lastUsed: clock,
                     text: text,
                     language: language,
                     appliedTheme: nil,
+                    appliedFont: nil,
                     highlightTask: nil
                 )
             }
@@ -115,12 +124,13 @@ struct CodePane: NSViewRepresentable {
                 entry.text = text
                 entry.language = language
                 entry.appliedTheme = nil
+                entry.appliedFont = nil
             }
             entry.lastUsed = clock
             entries[tabID] = entry
 
-            if entry.appliedTheme != theme {
-                applyContent(to: tabID, theme: theme)
+            if entry.appliedTheme != theme || entry.appliedFont != font {
+                applyContent(to: tabID, theme: theme, font: font)
             }
 
             show(entries[tabID]!, tabID: tabID, in: container)
@@ -129,34 +139,45 @@ struct CodePane: NSViewRepresentable {
                 restore(savedState, in: entry)
             }
 
-            if themeChanged {
+            if themeChanged || fontChanged {
                 for otherID in entries.keys where otherID != tabID {
-                    applyContent(to: otherID, theme: theme)
+                    applyContent(to: otherID, theme: theme, font: font)
                 }
             }
 
             evictIfNeeded()
         }
 
-        /// Paints one entry for `theme`: from the cache when possible,
-        /// otherwise plain text first and a styled swap-in once the
+        /// Paints one entry for `theme` and `font`: from the cache when
+        /// possible, otherwise plain text first and a styled swap-in once the
         /// background highlight finishes.
-        private func applyContent(to tabID: String, theme: HighlightTheme) {
+        private func applyContent(to tabID: String, theme: HighlightTheme, font: EditorFont) {
             guard var entry = entries[tabID] else { return }
             entry.highlightTask?.cancel()
             entry.highlightTask = nil
             entry.appliedTheme = theme
+            entry.appliedFont = font
             entries[tabID] = entry
 
             let editorView = entry.editorView
             let documentID = entry.documentID
             let cacheKey = "\(tabID)#\(documentID)"
 
-            if let styled = cache.result(for: cacheKey, theme: theme) {
-                editorView.setAttributedText(styled)
+            // The pane adopts the theme's own background only for user-picked
+            // themes; the appearance-following defaults keep the system one.
+            let cached = cache.result(for: cacheKey, theme: theme, fontID: font.id)
+
+            if let cached {
+                editorView.applyFont(font)
+                editorView.setBackground(theme.usesThemeBackground ? cached.background : nil)
+                editorView.setAttributedText(cached.attributed)
                 return
             }
 
+            editorView.applyFont(font)
+            // Plain paint first; the theme background (if any) lands with the
+            // styled swap-in below.
+            editorView.setBackground(nil)
             editorView.setText(entry.text)
             guard let language = entry.language else { return }
 
@@ -170,13 +191,21 @@ struct CodePane: NSViewRepresentable {
                         language: language,
                         theme: theme
                     )
-                    let styled = CodeTextFactory.styled(raw.attributed)
+                    let styled = CodeTextFactory.styled(raw.attributed, font: font)
+                    let background = theme.usesThemeBackground ? raw.background : nil
                     guard !Task.isCancelled,
                           let current = self.entries[tabID],
                           current.editorView === editorView,
                           current.documentID == documentID,
-                          current.appliedTheme == theme else { return }
-                    self.cache.store(styled, for: cacheKey, theme: theme)
+                          current.appliedTheme == theme,
+                          current.appliedFont == font else { return }
+                    self.cache.store(
+                        HighlightCache.Entry(attributed: styled, background: background),
+                        for: cacheKey,
+                        theme: theme,
+                        fontID: font.id
+                    )
+                    editorView.setBackground(background)
                     editorView.setAttributedText(styled)
                 } catch is CancellationError {
                 } catch HighlightError.unsupportedLanguage {
@@ -263,16 +292,19 @@ final class CodeEditorView: NSView {
     let scrollView: NSScrollView
     let textView: NSTextView
 
+    private var font: EditorFont
     private let lineNumberView: LineNumberRulerView
     private var lineNumberWidthConstraint: NSLayoutConstraint!
 
-    init() {
-        let content = CodeTextFactory.makeTextView()
+    init(font: EditorFont = .default) {
+        self.font = font
+        let content = CodeTextFactory.makeTextView(font: font)
         scrollView = content.scrollView
         textView = content.textView
         lineNumberView = LineNumberRulerView(
             textView: content.textView,
-            scrollView: content.scrollView
+            scrollView: content.scrollView,
+            lineHeight: font.lineHeight
         )
         super.init(frame: .zero)
 
@@ -306,9 +338,31 @@ final class CodeEditorView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Re-pins the editor's font and paragraph metrics. The attributed text
+    /// painted afterwards carries the same metrics, so the line-number ruler
+    /// stays aligned.
+    func applyFont(_ font: EditorFont) {
+        guard font != self.font else { return }
+        self.font = font
+        textView.font = font.nsFont
+        textView.defaultParagraphStyle = CodeTextFactory.paragraphStyle(font)
+        textView.typingAttributes = CodeTextFactory.attributes(font)
+        lineNumberView.lineHeight = font.lineHeight
+        lineNumberView.needsDisplay = true
+    }
+
+    /// `nil` restores the system control background (stock look); a theme
+    /// color paints the text view, scroll view and line-number ruler alike.
+    func setBackground(_ color: NSColor?) {
+        let resolved = color ?? .controlBackgroundColor
+        textView.backgroundColor = resolved
+        scrollView.backgroundColor = resolved
+        lineNumberView.backgroundColor = resolved
+    }
+
     func setText(_ text: String) {
         setAttributedText(
-            NSAttributedString(string: text, attributes: CodeTextFactory.attributes())
+            NSAttributedString(string: text, attributes: CodeTextFactory.attributes(font))
         )
     }
 
@@ -323,18 +377,7 @@ final class CodeEditorView: NSView {
 }
 
 enum CodeTextFactory {
-    static let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-    /// Pinned through `minimumLineHeight`/`maximumLineHeight` so the ruler can
-    /// place line numbers without querying TextKit layout.
-    static let lineHeight: CGFloat = (lineHeight(for: font) + 2).rounded()
-
-    private static let metricsManager = NSLayoutManager()
-
-    static func lineHeight(for font: NSFont) -> CGFloat {
-        metricsManager.defaultLineHeight(for: font)
-    }
-
-    static func makeTextView() -> (scrollView: NSScrollView, textView: NSTextView) {
+    static func makeTextView(font: EditorFont) -> (scrollView: NSScrollView, textView: NSTextView) {
         let textView = NSTextView(usingTextLayoutManager: false)
         textView.isEditable = false
         textView.isSelectable = true
@@ -345,9 +388,9 @@ enum CodeTextFactory {
         textView.drawsBackground = true
         textView.backgroundColor = .controlBackgroundColor
         textView.textColor = .labelColor
-        textView.font = font
-        textView.defaultParagraphStyle = paragraphStyle()
-        textView.typingAttributes = attributes()
+        textView.font = font.nsFont
+        textView.defaultParagraphStyle = paragraphStyle(font)
+        textView.typingAttributes = attributes(font)
         textView.textContainerInset = .zero
         textView.textContainer?.lineFragmentPadding = 4
         textView.isVerticallyResizable = true
@@ -376,29 +419,32 @@ enum CodeTextFactory {
         return (scrollView, textView)
     }
 
-    static func attributes() -> [NSAttributedString.Key: Any] {
+    static func attributes(_ font: EditorFont) -> [NSAttributedString.Key: Any] {
         [
-            .font: font,
+            .font: font.nsFont,
             .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: paragraphStyle(),
+            .paragraphStyle: paragraphStyle(font),
         ]
     }
 
     /// Merges a highlighter's output with the pane's pinned metrics: keeps the
-    /// color attributes, swaps the font for the fixed mono font (preserving
+    /// color attributes, swaps the font for the editor font (preserving
     /// bold/italic traits when the theme offers them) and forces the pinned
     /// paragraph style so the line-number ruler stays aligned. Characters are
     /// never changed.
-    static func styled(_ highlighted: NSAttributedString) -> NSAttributedString {
+    static func styled(
+        _ highlighted: NSAttributedString,
+        font: EditorFont
+    ) -> NSAttributedString {
         let result = NSMutableAttributedString(attributedString: highlighted)
         guard result.length > 0 else { return result }
 
         let full = NSRange(location: 0, length: result.length)
-        let paragraph = paragraphStyle()
+        let paragraph = paragraphStyle(font)
         result.enumerateAttributes(in: full) { attributes, range, _ in
             var styledAttributes = attributes
             styledAttributes[.paragraphStyle] = paragraph
-            styledAttributes[.font] = font(matching: attributes[.font] as? NSFont)
+            styledAttributes[.font] = resolvingFont(matching: attributes[.font] as? NSFont, base: font)
             styledAttributes[.foregroundColor] =
                 attributes[.foregroundColor] as? NSColor ?? NSColor.labelColor
             // Themes stamp their own background on spans; the pane decides
@@ -409,20 +455,24 @@ enum CodeTextFactory {
         return result
     }
 
-    private static func font(matching themed: NSFont?) -> NSFont {
-        guard let themed else { return font }
+    private static func resolvingFont(matching themed: NSFont?, base: EditorFont) -> NSFont {
+        let baseFont = base.nsFont
+        guard let themed else { return baseFont }
         let traits = themed.fontDescriptor.symbolicTraits
-        guard !traits.isEmpty else { return font }
-        let descriptor = font.fontDescriptor.withSymbolicTraits(traits)
-        return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
+        guard !traits.isEmpty else { return baseFont }
+        let descriptor = baseFont.fontDescriptor.withSymbolicTraits(traits)
+        return NSFont(descriptor: descriptor, size: baseFont.pointSize) ?? baseFont
     }
 
-    private static func paragraphStyle() -> NSParagraphStyle {
+    static func paragraphStyle(_ font: EditorFont) -> NSParagraphStyle {
+        // The line height is pinned through minimum/maximumLineHeight so the
+        // ruler can place line numbers without querying TextKit layout.
+        let lineHeight = font.lineHeight
         let style = NSMutableParagraphStyle()
         style.minimumLineHeight = lineHeight
         style.maximumLineHeight = lineHeight
         style.lineSpacing = 0
-        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
+        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font.nsFont]).width
         style.tabStops = []
         style.defaultTabInterval = spaceWidth * 4
         return style

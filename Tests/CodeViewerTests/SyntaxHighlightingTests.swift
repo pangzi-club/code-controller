@@ -32,29 +32,54 @@ struct HighlightCacheTests {
     @Test("round-trips a stored result and isolates themes")
     func roundTripsAndIsolatesThemes() {
         let cache = HighlightCache()
-        let light = NSAttributedString(string: "light")
-        let dark = NSAttributedString(string: "dark")
+        let light = HighlightCache.Entry(attributed: NSAttributedString(string: "light"), background: nil)
+        let dark = HighlightCache.Entry(attributed: NSAttributedString(string: "dark"), background: nil)
+        let fontID = EditorFont.default.id
 
-        #expect(cache.result(for: "doc#1", theme: .light) == nil)
+        #expect(cache.result(for: "doc#1", theme: .light, fontID: fontID) == nil)
 
-        cache.store(light, for: "doc#1", theme: .light)
-        #expect(cache.result(for: "doc#1", theme: .light) == light)
-        #expect(cache.result(for: "doc#1", theme: .dark) == nil)
+        cache.store(light, for: "doc#1", theme: .light, fontID: fontID)
+        #expect(cache.result(for: "doc#1", theme: .light, fontID: fontID)?.attributed == light.attributed)
+        #expect(cache.result(for: "doc#1", theme: .dark, fontID: fontID) == nil)
+    }
+
+    @Test("a font change misses the cache")
+    func isolatesFonts() {
+        let cache = HighlightCache()
+        cache.store(
+            HighlightCache.Entry(attributed: NSAttributedString(string: "a"), background: nil),
+            for: "doc#1",
+            theme: .light,
+            fontID: "system#13.0"
+        )
+
+        #expect(cache.result(for: "doc#1", theme: .light, fontID: "system#13.0") != nil)
+        #expect(cache.result(for: "doc#1", theme: .light, fontID: "system#15.0") == nil)
     }
 
     @Test("evicts the least recently used entry")
     func evictsLeastRecentlyUsed() {
         let cache = HighlightCache(capacity: 2)
-        cache.store(NSAttributedString(string: "a"), for: "a", theme: .light)
-        cache.store(NSAttributedString(string: "b"), for: "b", theme: .light)
+        let fontID = EditorFont.default.id
+        cache.store(
+            HighlightCache.Entry(attributed: NSAttributedString(string: "a"), background: nil),
+            for: "a", theme: .light, fontID: fontID
+        )
+        cache.store(
+            HighlightCache.Entry(attributed: NSAttributedString(string: "b"), background: nil),
+            for: "b", theme: .light, fontID: fontID
+        )
 
         // Touching "a" makes "b" the least recently used.
-        _ = cache.result(for: "a", theme: .light)
-        cache.store(NSAttributedString(string: "c"), for: "c", theme: .light)
+        _ = cache.result(for: "a", theme: .light, fontID: fontID)
+        cache.store(
+            HighlightCache.Entry(attributed: NSAttributedString(string: "c"), background: nil),
+            for: "c", theme: .light, fontID: fontID
+        )
 
-        #expect(cache.result(for: "a", theme: .light) != nil)
-        #expect(cache.result(for: "b", theme: .light) == nil)
-        #expect(cache.result(for: "c", theme: .light) != nil)
+        #expect(cache.result(for: "a", theme: .light, fontID: fontID) != nil)
+        #expect(cache.result(for: "b", theme: .light, fontID: fontID) == nil)
+        #expect(cache.result(for: "c", theme: .light, fontID: fontID) != nil)
     }
 }
 
@@ -72,18 +97,19 @@ struct CodeTextFactoryStylingTests {
             range: NSRange(location: 0, length: 3)
         )
 
-        let styled = CodeTextFactory.styled(input)
+        let editorFont = EditorFont.default
+        let styled = CodeTextFactory.styled(input, font: editorFont)
 
         #expect(styled.string == input.string)
 
         let paragraph = styled.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
-        #expect(paragraph?.minimumLineHeight == CodeTextFactory.lineHeight)
-        #expect(paragraph?.maximumLineHeight == CodeTextFactory.lineHeight)
+        #expect(paragraph?.minimumLineHeight == editorFont.lineHeight)
+        #expect(paragraph?.maximumLineHeight == editorFont.lineHeight)
 
         // The pinned mono font wins, but the theme's bold trait survives so
         // themes can still emphasize keywords.
         let font = styled.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
-        #expect(font?.pointSize == CodeTextFactory.font.pointSize)
+        #expect(font?.pointSize == editorFont.nsFont.pointSize)
         #expect(font?.fontDescriptor.symbolicTraits.contains(.bold) == true)
         let plainFont = styled.attribute(.font, at: 5, effectiveRange: nil) as? NSFont
         #expect(plainFont?.fontDescriptor.symbolicTraits.contains(.bold) == false)
@@ -95,9 +121,23 @@ struct CodeTextFactoryStylingTests {
 
     @Test("falls back to label color when the highlighter omits one")
     func fillsMissingForeground() {
-        let styled = CodeTextFactory.styled(NSAttributedString(string: "plain"))
+        let styled = CodeTextFactory.styled(
+            NSAttributedString(string: "plain"),
+            font: .default
+        )
         let color = styled.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
         #expect(color == NSColor.labelColor)
+    }
+
+    @Test("a custom editor font replaces the highlighter's fonts, traits preserved")
+    func usesCustomEditorFont() throws {
+        let editorFont = EditorFont(fontName: "Menlo", size: 15)
+        let input = NSAttributedString(string: "let x = 1")
+        let styled = CodeTextFactory.styled(input, font: editorFont)
+
+        let font = try #require(styled.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(font.pointSize == 15)
+        #expect(font.familyName == "Menlo")
     }
 }
 
@@ -129,6 +169,19 @@ struct HighlighterSwiftHighlighterTests {
         await #expect(throws: HighlightError.self) {
             try await highlighter.highlight("x", language: "definitely-not-a-language", theme: .light)
         }
+    }
+
+    @Test("a user-picked theme reports its own background color")
+    func pickedThemeReportsBackground() async throws {
+        let source = "let x = 1\n"
+        let result = try await highlighter.highlight(
+            source,
+            language: "swift",
+            theme: HighlightTheme(name: "dracula")
+        )
+
+        #expect(result.attributed.string == source)
+        #expect(result.background != nil)
     }
 
     @Test("a 1500-line Swift file highlights without trouble")

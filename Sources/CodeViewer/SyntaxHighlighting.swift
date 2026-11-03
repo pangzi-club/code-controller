@@ -2,12 +2,24 @@ import Foundation
 import Highlighter
 import SwiftUI
 
-/// Which highlight.js color set to render with; mirrors the system appearance
-/// so the code pane stays readable when the user switches light/dark. The
-/// names must match a `.css` file bundled with HighlighterSwift.
-public enum HighlightTheme: String, CaseIterable, Sendable {
-    case light = "xcode"
-    case dark = "xcode-dusk"
+/// Which highlight.js color set to render with. Either one of the two
+/// appearance-following defaults or a user-picked bundled HighlighterSwift
+/// theme by name — names must match a `.css` file bundled with
+/// HighlighterSwift.
+public struct HighlightTheme: Equatable, Sendable {
+    public let name: String
+    /// Whether the code pane should adopt the theme's own background color:
+    /// user-picked themes do (their palettes assume it), the
+    /// appearance-following defaults keep the stock system background.
+    public let usesThemeBackground: Bool
+
+    public init(name: String, usesThemeBackground: Bool = true) {
+        self.name = name
+        self.usesThemeBackground = usesThemeBackground
+    }
+
+    public static let light = HighlightTheme(name: "xcode", usesThemeBackground: false)
+    public static let dark = HighlightTheme(name: "xcode-dusk", usesThemeBackground: false)
 
     public init(colorScheme: ColorScheme) {
         self = colorScheme == .dark ? .dark : .light
@@ -36,9 +48,12 @@ public enum HighlightError: Error, LocalizedError {
 /// by the highlighter actor before handoff and never mutated afterwards.
 public struct HighlightedText: @unchecked Sendable {
     public let attributed: NSAttributedString
+    /// Background color parsed from the theme's `.hljs` CSS rule, if any.
+    public let background: NSColor?
 
-    public init(attributed: NSAttributedString) {
+    public init(attributed: NSAttributedString, background: NSColor? = nil) {
         self.attributed = attributed
+        self.background = background
     }
 }
 
@@ -161,8 +176,8 @@ public actor HighlighterSwiftHighlighter: SyntaxHighlighter {
     public func highlight(_ text: String, language: String, theme: HighlightTheme) async throws -> HighlightedText {
         let engine = try self.engine()
         if loadedTheme != theme {
-            guard engine.setTheme(theme.rawValue) else {
-                throw HighlightError.renderFailed(theme.rawValue)
+            guard engine.setTheme(theme.name) else {
+                throw HighlightError.renderFailed(theme.name)
             }
             loadedTheme = theme
         }
@@ -172,7 +187,10 @@ public actor HighlighterSwiftHighlighter: SyntaxHighlighter {
         guard let result = engine.highlight(text, as: language, doFastRender: true) else {
             throw HighlightError.renderFailed(language)
         }
-        return HighlightedText(attributed: result)
+        return HighlightedText(
+            attributed: result,
+            background: engine.theme?.themeBackgroundColour
+        )
     }
 
     private func engine() throws -> Highlighter {
@@ -220,13 +238,26 @@ public final class HighlightService {
     }
 }
 
-/// LRU cache of finished highlight results, keyed by document version and
-/// theme. Lives on the main actor so the code pane can check it synchronously
-/// and paint a switched-to tab without a flash of plain text.
+/// LRU cache of finished highlight results, keyed by document version,
+/// theme and editor font. Lives on the main actor so the code pane can check
+/// it synchronously and paint a switched-to tab without a flash of plain text.
 @MainActor
 public final class HighlightCache {
+    /// A finished styled result plus the theme background it was rendered
+    /// with, so a cache hit can paint the pane background without
+    /// re-highlighting.
+    public struct Entry {
+        public let attributed: NSAttributedString
+        public let background: NSColor?
+
+        public init(attributed: NSAttributedString, background: NSColor?) {
+            self.attributed = attributed
+            self.background = background
+        }
+    }
+
     private struct Slot {
-        let attributed: NSAttributedString
+        let entry: Entry
         var lastUsed: Int
     }
 
@@ -238,25 +269,25 @@ public final class HighlightCache {
         self.capacity = capacity
     }
 
-    public func result(for key: String, theme: HighlightTheme) -> NSAttributedString? {
-        let key = Self.cacheKey(key, theme: theme)
+    public func result(for key: String, theme: HighlightTheme, fontID: String) -> Entry? {
+        let key = Self.cacheKey(key, theme: theme, fontID: fontID)
         guard var slot = slots[key] else { return nil }
         clock += 1
         slot.lastUsed = clock
         slots[key] = slot
-        return slot.attributed
+        return slot.entry
     }
 
-    public func store(_ attributed: NSAttributedString, for key: String, theme: HighlightTheme) {
-        let key = Self.cacheKey(key, theme: theme)
+    public func store(_ entry: Entry, for key: String, theme: HighlightTheme, fontID: String) {
+        let key = Self.cacheKey(key, theme: theme, fontID: fontID)
         guard slots[key] == nil else { return }
         clock += 1
-        slots[key] = Slot(attributed: attributed, lastUsed: clock)
+        slots[key] = Slot(entry: entry, lastUsed: clock)
         evictIfNeeded()
     }
 
-    private static func cacheKey(_ key: String, theme: HighlightTheme) -> String {
-        "\(key)#\(theme.rawValue)"
+    private static func cacheKey(_ key: String, theme: HighlightTheme, fontID: String) -> String {
+        "\(key)#\(theme.name)#\(fontID)"
     }
 
     private func evictIfNeeded() {
