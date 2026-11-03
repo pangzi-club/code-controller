@@ -177,6 +177,35 @@ instead of a developer's home path.
   separate view to the scroll view's leading edge; do not attach it as an
   `NSRulerView` overlay. The code clip view therefore keeps a zero minimum
   scroll origin, and the two views cannot draw into the tab bar above them.
+- `make-app.sh` must copy **every** SwiftPM resource bundle from the products
+  directory into `Contents/Resources` — the library's own and one per
+  dependency (`Highlighter_Highlighter` for the syntax highlighter). A
+  dependency's `Bundle.module` fatals on first use in the assembled app when
+  its bundle is missing, and unit tests never catch it because they run from
+  `.build`, where the bundle is reachable.
+- Syntax highlighting is `SyntaxHighlighter` (protocol) over
+  `HighlighterSwift` — note the module/product name is `Highlighter`, not the
+  repository name — owned by a background actor (`HighlightrHighlighter`
+  style: one engine per actor, theme loads serialized). `CodeTextFactory.
+  styled` must re-pin font and paragraph style over any highlighter output
+  (colors may be themed, metrics may not — the ruler contract above).
+  Finished results cache per document version + theme in `HighlightCache`;
+  `DocumentStore.reloadIfChanged` (mtime + size) is what keeps watcher
+  bursts from invalidating that cache, so do not replace plain `reload()`
+  with it on the watcher path.
+- `git log --pretty=format:` interleaves a bare newline **between** records
+  (separator semantics, unlike `tformat:`), so every parsed commit record
+  after the first starts with `\n`; strip it or the hash is polluted and
+  `git show` exits 128. Repository detection checks only the workspace root
+  for `.git` — deliberately no walk-up, so a workspace that is a subfolder of
+  some enclosing repository stays badge-free instead of showing statuses
+  from a repo the user never chose.
+- The tab key monitor (`ContentView.installTabKeyMonitor`) matches keys by
+  ANSI keycode with only ⇧⌃⌥ rejected as modifiers. Caps lock stamps
+  `.alphaShift` on real key events and uppercases the event characters, so
+  strict flags equality or matching the literal `"w"` misses
+  a physical ⌘W and the system Close shortcut closes the whole window.
+  CGEvent injection does not reproduce this — it carries no `.alphaShift`.
 - SwiftUI window restoration keys the saved frame by the scene's explicit id,
   or by its content type when no id is given: the main `Window("", id: "main")`
   saves as `NSWindow Frame main` in the app's UserDefaults (the old

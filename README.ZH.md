@@ -6,11 +6,15 @@
 
 ## 功能
 
-- **侧边栏**：通过「添加文件夹」按钮或直接拖拽添加文件夹；右键可移除或在 Finder 中显示。每个文件夹根据路径分配一个稳定的彩色标识块。侧边栏使用系统原生的半透明材质，并延伸到透明标题栏的交通灯下方。
-- **文件列表**：卡片式展示所选文件夹的直接子项（文件夹在前，再按名称排序），带系统图标、文件大小和修改时间，支持悬停高亮。
-- **打开文件**：双击用系统默认应用打开；右键菜单提供「打开」和「在 Finder 中显示」。
+- **工作区侧边栏**：通过工作区菜单或拖拽添加文件夹；每个工作区根据路径分配一个稳定的彩色标识块。侧边栏提供「文件 / 提交」面板切换，使用系统原生半透明材质，并延伸到透明标题栏的交通灯下方。
+- **文件树**：懒加载的递归目录树（文件夹在前，再按名称排序），悬停高亮，右键菜单（打开、显示 Git 差异、在 Finder 中显示），每行带 Git 状态徽章。
+- **文档标签页**：每个文件一个标签，标题中间截断、两行折行、可关闭，并带同样的 Git 状态徽章。⌘W 关闭当前标签（无标签时不会关掉窗口）；⌘1…⌘9 切换标签。编辑器视图以 LRU 池复用（8 个），切换标签保留滚动位置和选区。
+- **语法高亮**：highlight.js（经 HighlighterSwift）在后台 actor 上运行，通过 `SyntaxHighlighter` 协议抽象、便于日后替换引擎。高亮结果按文档版本和主题缓存（LRU，12 条）；输出会重新套用固定的等宽字体和行高，行号尺不错位；配色跟随系统浅色 / 深色外观。
+- **Git 集成**：在工作区根目录探测仓库，未装 git 或非仓库时优雅降级；`git status` 的 M/A/D/? 徽章显示在文件树和标签上；只读 diff 面板可看单文件（工作区 vs HEAD）和整条提交（⌘R 刷新文件树、状态、提交列表和当前文档）。
+- **提交历史**：侧边栏 Graph 面板列出最近提交——信息、作者、相对时间、分支徽章——点击任意提交查看完整 diff。
+- **自动刷新**：每个工作区一个 FSEvents 监听，事件突发经 debounce 合并；文件树、Git 状态和发生变化的已打开文档自动刷新。未变化的文档通过 mtime/size 检测跳过，高亮缓存不受无关变动影响。
 - **设置窗口**：系统 / 浅色 / 深色主题切换，以及界面语言切换（跟随系统 / English / 简体中文），选择会被持久化并应用到全局——独立固定尺寸窗口，通过 App 菜单的 ⌘, 打开。
-- **持久化**：文件夹列表以 security-scoped bookmark 的形式存于 UserDefaults（App Store 沙盒构建在重启后仍可访问；失效文件夹会被过滤），窗口框架由系统在重启后恢复。
+- **持久化**：工作区列表以 security-scoped bookmark 的形式存于 UserDefaults（App Store 沙盒构建在重启后仍可访问；失效文件夹会被过滤），窗口框架由系统在重启后恢复。
 - **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
 - **诊断**：结构化统一日志会同步写入轮转文件日志，启动横幅会记录 bundle、沙盒和日志路径。
 - 自动适配浅色 / 深色外观。
@@ -98,11 +102,20 @@ make mas                    # 产物：build/CodeViewer-0.1-1.pkg
 Sources/
 ├── CodeViewer/                 # Library target：全部视图、模型、store
 │   ├── AppInfo.swift             # 显示名 / bundle ID / 版本 / 构建号（唯一事实来源）
-│   ├── ContentView.swift         # 分栏布局：侧边栏 + 详情页
-│   ├── FileListView.swift        # 卡片式文件列表
-│   ├── FolderStore.swift         # 侧边栏文件夹列表 + security-scoped bookmark
+│   ├── ContentView.swift         # 分栏布局、详情页、标签页快捷键监听
+│   ├── SidebarView.swift         # 工作区菜单 + 文件/提交面板切换
+│   ├── FileTree.swift            # 懒加载目录树 store
+│   ├── FileTreeView.swift        # 带 Git 徽章的目录树行
+│   ├── DocumentTab.swift         # 标签模型（URL + 每标签 DocumentStore）
+│   ├── DocumentTabBar.swift      # 可折行的标签条 + 徽章
+│   ├── CodePane.swift            # LRU 池化 NSTextView 编辑器 + 固定排版度量
+│   ├── SyntaxHighlighting.swift  # SyntaxHighlighter 协议、HighlighterSwift 适配、缓存
+│   ├── GitService.swift          # git CLI：status/diff/log + 可观察状态 store
+│   ├── GitGraphView.swift        # 提交历史面板
+│   ├── GitDiffSheet.swift        # 只读 diff 面板（单文件或整条提交）
+│   ├── WorkspaceWatcher.swift    # FSEvents 监听 + debounce
+│   ├── WorkspaceSession.swift    # 每工作区的标签、目录树、git、监听器
 │   ├── Log.swift                 # 统一日志 + 轮转文件日志
-│   ├── Models.swift              # 文件加载、打开/定位助手
 │   ├── PreviewFixtures.swift     # 仅 DEBUG 的 Xcode Preview 示例文件夹
 │   ├── L10n.swift                # 本地化辅助
 │   ├── SettingsStore.swift       # 主题 + 语言偏好与持久化
@@ -112,7 +125,7 @@ Sources/
 │       ├── zh-Hans.lproj/Localizable.strings
 │       └── PrivacyInfo.xcprivacy  # required-reason API 声明
 └── CodeViewerApp/
-    └── CodeViewerApp.swift     # 薄 @main 入口和窗口场景
+    └── CodeViewerApp.swift     # 薄 @main 入口、窗口场景、⌘R/⌘S 命令
 Tests/CodeViewerTests/          # Swift Testing 测试
 Scripts/
 ├── App.entitlements              # 本地/Developer ID 权限（不沙盒）
