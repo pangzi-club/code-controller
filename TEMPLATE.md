@@ -46,6 +46,9 @@ app-specific sections, so merge the relevant bullets by hand. `README.md` and
 
 ## Changelog
 
+- 2026-11-03 — packaging: `make app` now assembles the single universal
+  `build/<Display Name>.app` by default; pass `ARCHS="arm64 x86_64"` for one
+  bundle per architecture or `ARCHS=arm64` for a thin host bundle.
 - 2026-11-03 — packaging: `ARCHS=universal` is accepted for direct/dev builds
   and produces a single lipo-merged `build/<Display Name>.app`; `make install`
   now builds and installs that universal bundle instead of the host-arch one.

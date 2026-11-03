@@ -24,10 +24,11 @@ instead of a developer's home path.
 - `make test` — run the test suite (`swift test`)
 - `make check-l10n` — verify both `Localizable.strings` files have the same keys
 - `make build` — release build
-- `make app` — assemble `build/<Display Name>-<arch>.app` for arm64 and x86_64
+- `make app` — assemble the universal `build/<Display Name>.app`
   (unsandboxed, Developer ID when the keychain has one, otherwise ad-hoc);
-  `ARCHS` selects a subset, e.g. `ARCHS=arm64 make app`, or a single
-  lipo-merged bundle with `ARCHS=universal`
+  `ARCHS` overrides, e.g. `ARCHS=arm64 make app` for a thin host bundle or
+  `ARCHS="arm64 x86_64" make app` for one bundle per architecture
+  (`build/<Display Name>-<arch>.app`)
 - `make install` — assemble the universal bundle (`ARCHS=universal`, a single
   lipo-merged `build/<Display Name>.app`), then replace
   `/Applications/<Display Name>.app` with it; quit the running copy first (see

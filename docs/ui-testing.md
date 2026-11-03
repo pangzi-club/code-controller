@@ -21,7 +21,9 @@ AppKit/SwiftUI surface.
   ```sh
   APP_NAME="$(sed -nE 's/^[[:space:]]*static let displayName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Sources/*/AppInfo.swift)"
   export APP_BUNDLE_ID="$(sed -nE 's/^[[:space:]]*static let bundleID[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Sources/*/AppInfo.swift)"
-  export APP_PATH="build/$APP_NAME-$(uname -m).app"   # make app (host arch)
+  export APP_PATH="build/$APP_NAME.app"   # make app (universal)
+  # Per-arch build from `ARCHS=arm64 make app`:
+  # export APP_PATH="build/$APP_NAME-$(uname -m).app"
   # Dev build from `make launch`:
   # export APP_BUNDLE_ID="$APP_BUNDLE_ID.dev"
   # export APP_PATH="build/$APP_NAME-Dev-$(uname -m).app"
@@ -298,9 +300,9 @@ a fresh domain on a throwaway user account or a VM.
 
 1. `swift test` — logic still passes.
 2. `make check-l10n` — if any `.strings` file changed.
-3. `make app` — arm64 and x86_64 release builds, unsandboxed signature
-   (Developer ID or ad-hoc). Use `make mas` for the sandboxed App Store build
-   and `make launch` for the dev identity.
+3. `make app` — universal (arm64 + x86_64) release build, unsandboxed
+   signature (Developer ID or ad-hoc). Use `make mas` for the sandboxed App
+   Store build and `make launch` for the dev identity.
 4. Launch and capture the changed surface (window, settings pane, state).
 5. Check the empty/error path if the surface has one.
 6. Check dark mode and the other UI language for new strings.

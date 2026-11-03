@@ -37,7 +37,7 @@ swift test    # or: make test
 
 There is also a `Makefile` with npm-scripts style shortcuts: `make dev` (debug
 run), `make test`, `make check-l10n` (verify localization key parity),
-`make app` (assemble arm64 and x86_64 bundles), `make install` (assemble the
+`make app` (assemble the universal bundle), `make install` (assemble the
 universal bundle and replace the copy in /Applications), `make launch`
 (assemble and open the dev build), `make mas` (App Store package), `make build`,
 `make rename` (template rename), `make template-diff` (show template drift),
@@ -103,24 +103,24 @@ hand.
 ## Packaging as a .app
 
 For the proper experience (Dock icon, menu bar, Cmd+Tab, double-clickable in
-Finder), assemble app bundles — one per architecture, or a single universal one
-for /Applications:
+Finder), assemble a universal app bundle:
 
 ```bash
-make app                    # build/DemoExplorer-arm64.app + build/DemoExplorer-x86_64.app
+make app                    # build/DemoExplorer.app (arm64 + x86_64)
 make launch                 # build/DemoExplorer-Dev-<host arch>.app, opened
 make install                # universal build, then replace /Applications/DemoExplorer.app
 ```
 
-`make-app.sh` builds a release bundle for each architecture — arm64 and x86_64
-by default, so Apple Silicon and Intel Macs each get a native app. Set `ARCHS`
-to build a subset, e.g. `ARCHS=arm64 ./Scripts/make-app.sh`, or `ARCHS=universal`
-for a single lipo-merged bundle (`build/<Display Name>.app`, what `make install`
-uses). Each bundle gets
+`make-app.sh` builds a release bundle for the requested architectures: by
+default `make app` lipo-merges arm64 and x86_64 into one universal
+`build/<Display Name>.app`, so the same bundle runs natively on Apple Silicon
+and Intel Macs. Set `ARCHS` to override, e.g. `ARCHS=arm64 make app` for a thin
+host-arch bundle, or `ARCHS="arm64 x86_64" make app` for one bundle per
+architecture (`build/<Display Name>-<arch>.app`). Each bundle gets
 the generated app icon (`Scripts/make-icon.swift` draws it programmatically),
 an Info.plist written from `AppInfo.swift` (display name, bundle ID, marketing
 version and build number) and `Package.swift` (minimum macOS), and a copy of
-the privacy manifest. `make app` signs each bundle with
+the privacy manifest. `make app` signs the bundle with
 `Scripts/App.entitlements` and uses a Developer ID certificate when the keychain
 has one (ad-hoc fallback); `SIGN_IDENTITY` overrides the choice. Local and
 Developer ID builds are **not sandboxed** by default — add local or

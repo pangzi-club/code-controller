@@ -31,7 +31,7 @@ swift run
 swift test    # 或：make test
 ```
 
-项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（同时组装 arm64 和 x86_64 两种包）、`make install`（组装 universal 包并替换 /Applications 中的副本）、`make launch`（组装并打开开发版）、`make mas`（App Store 安装包）、`make build`、`make rename`（模板重命名）、`make template-diff`（查看与模板的差异）、`make clean`。运行 `make help` 查看全部。`.vscode/launch.json` 提供 VS Code Swift 扩展的 Debug/Release 启动配置，`rename.sh` 会同步更新目标名。
+项目还带一个 `Makefile`，提供 npm-scripts 风格的快捷命令：`make dev`（调试运行）、`make test`、`make check-l10n`（校验本地化键对齐）、`make app`（组装 universal 包）、`make install`（组装 universal 包并替换 /Applications 中的副本）、`make launch`（组装并打开开发版）、`make mas`（App Store 安装包）、`make build`、`make rename`（模板重命名）、`make template-diff`（查看与模板的差异）、`make clean`。运行 `make help` 查看全部。`.vscode/launch.json` 提供 VS Code Swift 扩展的 Debug/Release 启动配置，`rename.sh` 会同步更新目标名。
 
 ## 验证 UI
 
@@ -68,15 +68,15 @@ swift test    # 或：make test
 
 ## 打包成 .app
 
-想要完整体验（Dock 图标、菜单栏、Cmd+Tab、可在 Finder 中双击打开），需要组装应用包——按架构分别产出，或合成单个 universal 包放进 /Applications：
+想要完整体验（Dock 图标、菜单栏、Cmd+Tab、可在 Finder 中双击打开），需要组装 universal 应用包：
 
 ```bash
-make app                    # 产物：build/DemoExplorer-arm64.app + build/DemoExplorer-x86_64.app
+make app                    # 产物：build/DemoExplorer.app（arm64 + x86_64）
 make launch                 # 产物：build/DemoExplorer-Dev-<本机架构>.app，并打开
 make install                # 构建 universal 包，然后替换 /Applications/DemoExplorer.app
 ```
 
-`make-app.sh` 会为每个架构构建 release 包（默认 arm64 和 x86_64，让 Apple Silicon 和 Intel Mac 都运行原生版本）；可用 `ARCHS` 只构建其中一种，例如 `ARCHS=arm64 ./Scripts/make-app.sh`；也可用 `ARCHS=universal` 构建单个 lipo 合并的 universal 包（产物 `build/<显示名>.app`，即 `make install` 使用的形式）。每个包都会生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist，并复制隐私清单。`make app` 会逐个使用 `Scripts/App.entitlements` 签名，优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。本地和 Developer ID 构建**默认不开启沙盒**，需要本地或 hardened runtime 权限时往该文件里加。
+`make-app.sh` 按 `ARCHS` 指定的架构构建 release 包：`make app` 默认把 arm64 和 x86_64 lipo 合并成单个 universal `build/<显示名>.app`，同一份包在 Apple Silicon 和 Intel Mac 上都原生运行；可用 `ARCHS` 覆盖，例如 `ARCHS=arm64 make app` 构建本机架构的瘦包，或 `ARCHS="arm64 x86_64" make app` 每个架构各出一个包（`build/<显示名>-<架构>.app`）。每个包都会生成应用图标（`Scripts/make-icon.swift` 程序化绘制）、根据 `AppInfo.swift`（显示名、bundle ID、营销版本、构建号）和 `Package.swift`（最低 macOS 版本）生成 Info.plist，并复制隐私清单。`make app` 会使用 `Scripts/App.entitlements` 签名，优先使用 Developer ID 证书，没有则退回 ad-hoc 签名；可用 `SIGN_IDENTITY` 指定身份。本地和 Developer ID 构建**默认不开启沙盒**，需要本地或 hardened runtime 权限时往该文件里加。
 
 App Store 构建开启 App Sandbox，因此 demo 用 security-scoped bookmark 持久化文件夹，而不是只存路径——仅凭路径在重启后会失去访问权限。沙盒会把 Application Support、UserDefaults 和缓存移入 `~/Library/Containers/<bundleID>/Data`，所以 `swift run` 或 `make app` 期间保存的文件夹和偏好不会带到 App Store 构建。生成的 `Info.plist` 会声明 `CFBundleLocalizations`，让 AppKit 标准菜单跟随应用内语言。
 

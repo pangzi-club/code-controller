@@ -6,7 +6,7 @@
 APPINFO := $(firstword $(wildcard Sources/*/AppInfo.swift))
 APP_DISPLAY_NAME := $(shell sed -nE 's/^[[:space:]]*static let displayName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' $(APPINFO))
 HOST_ARCH := $(shell uname -m)
-APP_PATH := build/$(APP_DISPLAY_NAME)-$(HOST_ARCH).app
+ARCHS ?= universal
 UNIVERSAL_APP_PATH := build/$(APP_DISPLAY_NAME).app
 DEV_APP_PATH := build/$(APP_DISPLAY_NAME)-Dev-$(HOST_ARCH).app
 
@@ -27,8 +27,8 @@ test: ## Run tests (Swift Testing + XCTest)
 check-l10n: ## Verify Localizable.strings key parity across languages
 	python3 Scripts/check-l10n.py
 
-app: ## Assemble arm64 and x86_64 .app bundles (Developer ID or ad-hoc)
-	./Scripts/make-app.sh
+app: ## Assemble the universal .app (ARCHS=arm64|x86_64 for one per arch)
+	ARCHS="$(ARCHS)" ./Scripts/make-app.sh
 
 install: ## Assemble the universal .app and install it into /Applications
 	ARCHS=universal ./Scripts/make-app.sh
