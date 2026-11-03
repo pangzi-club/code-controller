@@ -34,6 +34,13 @@ struct CodeViewerApp: App {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
                 .keyboardShortcut("s", modifiers: [.control, .command])
+
+                Divider()
+
+                Button(l10nString("Refresh Workspace")) {
+                    NotificationCenter.default.post(name: .refreshWorkspace, object: nil)
+                }
+                .keyboardShortcut("r", modifiers: .command)
             }
         }
 

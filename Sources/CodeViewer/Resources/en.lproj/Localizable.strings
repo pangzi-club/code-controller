@@ -14,7 +14,9 @@
 "Show in Finder" = "Show in Finder";
 "Open" = "Open";
 "Close Tab" = "Close Tab";
+"Close" = "Close";
 "Refresh" = "Refresh";
+"Refresh Workspace" = "Refresh Workspace";
 "Toggle Sidebar" = "Toggle Sidebar";
 "Settings" = "Settings";
 "General" = "General";
@@ -26,3 +28,15 @@
 "English" = "English";
 "Simplified Chinese" = "简体中文";
 "Restart to apply the new language" = "Restart to apply the new language";
+"Show Git Diff" = "Show Git Diff";
+"Git Diff" = "Git Diff";
+"No changes" = "No changes";
+"Modified" = "Modified";
+"Added" = "Added";
+"Deleted" = "Deleted";
+"Untracked" = "Untracked";
+"Files" = "Files";
+"Graph" = "Graph";
+"Sidebar Pane" = "Sidebar Pane";
+"This workspace is not a Git repository" = "This workspace is not a Git repository";
+"No commits yet" = "No commits yet";

@@ -1,7 +1,13 @@
 import SwiftUI
 
-/// Sidebar: a workspace menu followed by the selected workspace's file tree.
+/// Sidebar: a workspace menu followed by the selected workspace's file tree
+/// or commit history.
 struct SidebarView: View {
+    private enum Pane {
+        case files
+        case graph
+    }
+
     let store: WorkspaceStore
     @Binding var selection: Workspace.ID?
     let session: WorkspaceSession?
@@ -10,7 +16,9 @@ struct SidebarView: View {
     let onAdd: () -> Void
     let onRemove: (Workspace) -> Void
     let onDropURL: (URL) -> Void
+    let onShowDiff: (URL) -> Void
 
+    @State private var pane: Pane = .files
     @State private var dropTargeted = false
 
     private var selectedWorkspace: Workspace? {
@@ -28,12 +36,32 @@ struct SidebarView: View {
                     .padding(.top, topPadding)
                     .padding(.bottom, 4)
 
+                panePicker
+                    .padding(.horizontal, 10)
+                    .padding(.top, 6)
+                    .padding(.bottom, 4)
+
                 if let session {
-                    FileTreeView(
-                        tree: session.tree,
-                        selectedURL: session.selectedURL,
-                        onOpen: { session.open($0) }
-                    )
+                    switch pane {
+                    case .files:
+                        FileTreeView(
+                            tree: session.tree,
+                            selectedURL: session.selectedURL,
+                            git: session.git,
+                            onOpen: { session.open($0) },
+                            onShowDiff: onShowDiff
+                        )
+                    case .graph:
+                        GitGraphView(
+                            git: session.git,
+                            onSelect: { commit in
+                                session.requestDiff = GitDiffRequest(
+                                    commitHash: commit.hash,
+                                    subject: commit.subject
+                                )
+                            }
+                        )
+                    }
                 } else {
                     Spacer()
                 }
@@ -100,8 +128,48 @@ struct SidebarView: View {
                 switcherLabel
             }
             .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var panePicker: some View {
+        Picker("", selection: $pane) {
+            Text(l10nString("Files")).tag(Pane.files)
+            Text(l10nString("Graph")).tag(Pane.graph)
+        }
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .labelsHidden()
+        .accessibilityLabel(l10n("Sidebar Pane"))
+    }
+
+    private var switcherLabel: some View {
+        // Name and path live in one label, so they align by construction no
+        // matter how the menu insets its content.
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(WorkspacePalette.color(for: selectedWorkspace?.url.path ?? "").gradient)
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white)
+                    )
+                    .shadow(
+                        color: WorkspacePalette.color(for: selectedWorkspace?.url.path ?? "").opacity(0.4),
+                        radius: 2,
+                        y: 1
+                    )
+
+                Text(selectedWorkspace?.name ?? l10nString("Workspace"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer(minLength: 0)
+            }
 
             if let selectedWorkspace {
                 Text(selectedWorkspace.url.abbreviatedPath)
@@ -111,31 +179,6 @@ struct SidebarView: View {
                     .truncationMode(.middle)
                     .padding(.leading, 38)
             }
-        }
-    }
-
-    private var switcherLabel: some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(WorkspacePalette.color(for: selectedWorkspace?.url.path ?? "").gradient)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                )
-                .shadow(
-                    color: WorkspacePalette.color(for: selectedWorkspace?.url.path ?? "").opacity(0.4),
-                    radius: 2,
-                    y: 1
-                )
-
-            Text(selectedWorkspace?.name ?? l10nString("Workspace"))
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())

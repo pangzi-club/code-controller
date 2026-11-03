@@ -9,8 +9,13 @@ import Observation
 final class WorkspaceSession {
     let workspace: Workspace
     let tree: FileTreeStore
+    let git: GitStatusStore
     private(set) var tabs: [DocumentTab] = []
     private(set) var selectedTabID: DocumentTab.ID?
+    /// Diff awaiting presentation in the read-only sheet; nil when none.
+    /// View-transient state set from the tree rows, the tab strip and the
+    /// commit history.
+    var requestDiff: GitDiffRequest?
 
     private let service: FileService
 
@@ -20,6 +25,7 @@ final class WorkspaceSession {
         self.workspace = workspace
         self.service = service
         tree = FileTreeStore(root: workspace.url, service: service)
+        git = GitStatusStore()
     }
 
     var selectedTab: DocumentTab? {
@@ -35,6 +41,14 @@ final class WorkspaceSession {
         guard !hasLoadedTree else { return }
         hasLoadedTree = true
         await tree.loadRoot()
+        await git.refresh(workspaceURL: workspace.url)
+    }
+
+    /// Manual refresh: the tree, git statuses and the selected document.
+    func refresh() async {
+        await tree.reload()
+        await git.refresh(workspaceURL: workspace.url)
+        reloadSelectedDocument()
     }
 
     func open(_ node: FileNode) {

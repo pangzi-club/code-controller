@@ -6,8 +6,10 @@ import SwiftUI
 struct DocumentTabBar: View {
     let tabs: [DocumentTab]
     let selectedTabID: DocumentTab.ID?
+    let git: GitStatusStore
     let onSelect: (DocumentTab) -> Void
     let onClose: (DocumentTab) -> Void
+    let onShowDiff: (DocumentTab) -> Void
 
     @State private var hoveredTabID: DocumentTab.ID?
     @State private var viewportWidth: CGFloat = 0
@@ -75,6 +77,7 @@ struct DocumentTabBar: View {
         let isSelected = tab.id == selectedTabID
         let isHovered = hoveredTabID == tab.id
         let showsCloseButton = isSelected || isHovered
+        let gitStatus = git.status(for: tab.url)
 
         return HStack(spacing: 4) {
             Button {
@@ -95,6 +98,14 @@ struct DocumentTabBar: View {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+            if let gitStatus {
+                Text(gitStatus.badge)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(gitStatus.color)
+                    .accessibilityLabel(l10n(gitStatus.labelKey))
+                    .help(l10nString(gitStatus.labelKey))
+            }
 
             if showsCloseButton {
                 Button {
@@ -145,6 +156,14 @@ struct DocumentTabBar: View {
             hoveredTabID = hovering ? tab.id : nil
         }
         .contextMenu {
+            if git.canShowDiff(for: tab.url) {
+                Button {
+                    onShowDiff(tab)
+                } label: {
+                    l10n("Show Git Diff")
+                }
+                Divider()
+            }
             Button {
                 onClose(tab)
             } label: {

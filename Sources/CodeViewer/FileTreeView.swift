@@ -4,7 +4,9 @@ import SwiftUI
 struct FileTreeView: View {
     let tree: FileTreeStore
     let selectedURL: URL?
+    let git: GitStatusStore
     let onOpen: (FileNode) -> Void
+    let onShowDiff: (URL) -> Void
 
     var body: some View {
         Group {
@@ -27,7 +29,9 @@ struct FileTreeView: View {
                                 row: row,
                                 tree: tree,
                                 selectedURL: selectedURL,
-                                onOpen: onOpen
+                                git: git,
+                                onOpen: onOpen,
+                                onShowDiff: onShowDiff
                             )
                         }
                     }
@@ -58,7 +62,9 @@ private struct FileTreeRowView: View {
     let row: FileTreeRow
     let tree: FileTreeStore
     let selectedURL: URL?
+    let git: GitStatusStore
     let onOpen: (FileNode) -> Void
+    let onShowDiff: (URL) -> Void
 
     @State private var isHovered = false
 
@@ -83,6 +89,12 @@ private struct FileTreeRowView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
+                if let gitStatus = git.status(for: row.node.url) {
+                    Text(gitStatus.badge)
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(gitStatus.color)
+                        .accessibilityLabel(l10n(gitStatus.labelKey))
+                }
                 if tree.loading.contains(row.node.id) {
                     ProgressView()
                         .controlSize(.mini)
@@ -110,6 +122,13 @@ private struct FileTreeRowView: View {
                     FileOpener.open(row.node.url)
                 } label: {
                     l10n("Open")
+                }
+            }
+            if git.canShowDiff(for: row.node.url) {
+                Button {
+                    onShowDiff(row.node.url)
+                } label: {
+                    l10n("Show Git Diff")
                 }
             }
             Button {
@@ -169,7 +188,9 @@ private struct FileTreePreview: View {
         FileTreeView(
             tree: session.tree,
             selectedURL: session.selectedURL,
-            onOpen: { session.open($0) }
+            git: session.git,
+            onOpen: { session.open($0) },
+            onShowDiff: { _ in }
         )
         .frame(width: 260, height: 420)
         .background(Color(nsColor: .windowBackgroundColor))

@@ -11,6 +11,7 @@ public struct Log {
     public static let tree = Log(category: "tree")
     public static let editor = Log(category: "editor")
     public static let window = Log(category: "window")
+    public static let git = Log(category: "git")
 
     private static let subsystem = AppInfo.bundleID
     private static let sink = LogFileSink()

@@ -23,7 +23,8 @@ public struct ContentView: View {
                 onSelect: select,
                 onAdd: presentWorkspacePicker,
                 onRemove: removeWorkspace,
-                onDropURL: addWorkspace
+                onDropURL: addWorkspace,
+                onShowDiff: { session?.requestDiff = GitDiffRequest(url: $0) }
             )
             // Removes the system sidebar toggle; its toolbar row would add a
             // 52pt strip above the content we no longer have room for.
@@ -162,6 +163,25 @@ private struct WorkspaceDetailView: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(title)
+        .onReceive(NotificationCenter.default.publisher(for: .refreshWorkspace)) { _ in
+            Task { await session.refresh() }
+        }
+        .sheet(item: diffRequestBinding) { request in
+            GitDiffSheet(
+                request: request,
+                root: session.git.repositoryRoot,
+                colorScheme: colorScheme
+            )
+        }
+    }
+
+    /// Bridges the session's optional diff request to the sheet's Identifiable
+    /// item binding; dismissal clears it again.
+    private var diffRequestBinding: Binding<GitDiffRequest?> {
+        Binding(
+            get: { session.requestDiff },
+            set: { session.requestDiff = $0 }
+        )
     }
 
     /// The window has no toolbar: tabs and actions live in one strip at the
@@ -175,8 +195,10 @@ private struct WorkspaceDetailView: View {
                     DocumentTabBar(
                         tabs: session.tabs,
                         selectedTabID: session.selectedTabID,
+                        git: session.git,
                         onSelect: { session.select($0) },
-                        onClose: { session.close($0) }
+                        onClose: { session.close($0) },
+                        onShowDiff: { session.requestDiff = GitDiffRequest(url: $0.url) }
                     )
                 }
             }

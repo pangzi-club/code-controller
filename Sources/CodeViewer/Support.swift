@@ -26,6 +26,10 @@ public extension Notification.Name {
     /// Posted by the View menu's Toggle Sidebar command; the main window owns
     /// the split view's column visibility.
     static let toggleSidebar = Notification.Name("\(AppInfo.bundleID).toggleSidebar")
+
+    /// Posted by the View menu's Refresh command; the workspace detail view
+    /// reloads the tree, git statuses and the selected document.
+    static let refreshWorkspace = Notification.Name("\(AppInfo.bundleID).refreshWorkspace")
 }
 
 /// SF Symbol per file type, shared by the tree and the tab strip.
