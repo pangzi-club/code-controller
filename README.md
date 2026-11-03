@@ -11,6 +11,7 @@ out of the box.
 
 - **Workspaces sidebar**: add folders from the workspace menu or by dragging them in; each gets a stable color tile derived from its path. The sidebar hosts a Files/Graph pane switch, uses the native translucent material, and extends under the transparent titlebar to the traffic lights.
 - **File tree**: lazily loaded recursive tree (directories first, then by name) with hover highlighting, context menus (Open, Show Git Diff, Show in Finder) and per-row git status badges.
+- **Quick open (⌘P)**: a floating search panel over the workspace. It rescans on every open, matches file names case-insensitively (falling back to relative-path matches), highlights the hit in the name, and navigates with ↑/↓ + Enter; Esc or a click outside dismisses it.
 - **Document tabs**: one tab per file with middle-truncating titles, two-row wrapping, a close button and the same git status badge. ⌘W closes the selected tab (does nothing with no tabs open, so it never takes the window down); ⌘1…⌘9 switch tabs. Views are pooled in an LRU (8 entries) so switching tabs preserves scroll position and selection. Image files (PNG, JPEG, GIF, WebP, HEIC, TIFF, BMP, SVG) open as scaled-to-fit previews — animated formats play, oversized files still hit the shared size limit, and corrupted ones fall back to the binary-file notice.
 - **Syntax highlighting**: highlight.js (via HighlighterSwift) running on a background actor, with a `SyntaxHighlighter` protocol seam for future engines. Finished results cache per document version, theme and editor font (LRU, 12 entries); the styled output is re-pinned to the editor font and pinned line height so the line-number ruler never shifts; separate editor themes for light and dark appearance (13 curated highlight.js themes, each rendered on its own background).
 - **Git integration**: repository detection at the workspace root with graceful degradation when git is missing; `git status` badges (M/A/D/?) on tree rows and tabs; read-only diff sheets for files (working tree vs HEAD) and whole commits (⌘R refreshes tree, statuses, commits and the selected document).
@@ -185,6 +186,7 @@ Sources/
 │   ├── GitDiffSheet.swift        # Read-only diff sheet (file or commit)
 │   ├── WorkspaceWatcher.swift    # FSEvents watcher with debounce
 │   ├── WorkspaceSession.swift    # Per-workspace tabs, tree, git, watcher
+│   ├── QuickOpen.swift           # ⌘P quick-open panel: recursive scan, matching, overlay UI
 │   ├── Log.swift                 # Unified logging + rotating file log
 │   ├── PreviewFixtures.swift     # DEBUG-only sample folder for Xcode Previews
 │   ├── L10n.swift                # Localization helpers
@@ -196,7 +198,7 @@ Sources/
 │       ├── zh-Hans.lproj/Localizable.strings
 │       └── PrivacyInfo.xcprivacy  # Required-reason API declarations
 └── CodeViewerApp/
-    └── CodeViewerApp.swift     # Thin @main entry point, window scene, ⌘R/⌘S commands
+    └── CodeViewerApp.swift     # Thin @main entry point, window scene, app menu commands
 Tests/CodeViewerTests/          # Swift Testing suite
 Scripts/
 ├── App.entitlements              # Local/Developer ID entitlements (unsandboxed)

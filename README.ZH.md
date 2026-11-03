@@ -8,6 +8,7 @@
 
 - **工作区侧边栏**：通过工作区菜单或拖拽添加文件夹；每个工作区根据路径分配一个稳定的彩色标识块。侧边栏提供「文件 / 提交」面板切换，使用系统原生半透明材质，并延伸到透明标题栏的交通灯下方。
 - **文件树**：懒加载的递归目录树（文件夹在前，再按名称排序），悬停高亮，右键菜单（打开、显示 Git 差异、在 Finder 中显示），每行带 Git 状态徽章。
+- **快速打开（⌘P）**：工作区上方的浮动搜索面板。每次打开重新扫描，文件名大小写不敏感匹配（无命中时回退到相对路径匹配），命中部分在文件名中高亮，↑/↓ + Enter 键盘导航，Esc 或点击面板外关闭。
 - **文档标签页**：每个文件一个标签，标题中间截断、两行折行、可关闭，并带同样的 Git 状态徽章。⌘W 关闭当前标签（无标签时不会关掉窗口）；⌘1…⌘9 切换标签。编辑器视图以 LRU 池复用（8 个），切换标签保留滚动位置和选区。图片文件（PNG、JPEG、GIF、WebP、HEIC、TIFF、BMP、SVG）打开为按比例适配的预览——动图照常播放，超大文件仍受统一大小上限约束，损坏文件回落到二进制提示。
 - **语法高亮**：highlight.js（经 HighlighterSwift）在后台 actor 上运行，通过 `SyntaxHighlighter` 协议抽象、便于日后替换引擎。高亮结果按文档版本、主题和编辑器字体缓存（LRU，12 条）；输出会重新套用编辑器字体和固定行高，行号尺不错位；浅色 / 深色外观各配一个编辑器主题（13 个精选 highlight.js 主题，均使用主题自身背景色渲染）。
 - **Git 集成**：在工作区根目录探测仓库，未装 git 或非仓库时优雅降级；`git status` 的 M/A/D/? 徽章显示在文件树和标签上；只读 diff 面板可看单文件（工作区 vs HEAD）和整条提交（⌘R 刷新文件树、状态、提交列表和当前文档）。
@@ -115,6 +116,7 @@ Sources/
 │   ├── GitDiffSheet.swift        # 只读 diff 面板（单文件或整条提交）
 │   ├── WorkspaceWatcher.swift    # FSEvents 监听 + debounce
 │   ├── WorkspaceSession.swift    # 每工作区的标签、目录树、git、监听器
+│   ├── QuickOpen.swift           # ⌘P 快速打开面板：递归扫描、匹配、浮层 UI
 │   ├── Log.swift                 # 统一日志 + 轮转文件日志
 │   ├── PreviewFixtures.swift     # 仅 DEBUG 的 Xcode Preview 示例文件夹
 │   ├── L10n.swift                # 本地化辅助
@@ -126,7 +128,7 @@ Sources/
 │       ├── zh-Hans.lproj/Localizable.strings
 │       └── PrivacyInfo.xcprivacy  # required-reason API 声明
 └── CodeViewerApp/
-    └── CodeViewerApp.swift     # 薄 @main 入口、窗口场景、⌘R/⌘S 命令
+    └── CodeViewerApp.swift     # 薄 @main 入口、窗口场景、App 菜单命令
 Tests/CodeViewerTests/          # Swift Testing 测试
 Scripts/
 ├── App.entitlements              # 本地/Developer ID 权限（不沙盒）

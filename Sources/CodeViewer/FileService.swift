@@ -142,6 +142,29 @@ actor FileService {
         }
     }
 
+    /// Recursively lists every file under `root`, directories excluded. Same
+    /// skip rules as `children(of:)` — `.git` and `.DS_Store` go, other
+    /// dot-files stay, symlinked directories are never followed (they surface
+    /// as files and cannot start a cycle). Depth-first, so the order mirrors
+    /// the expanded tree. Throws `CancellationError` through when the caller's
+    /// task is cancelled between directories.
+    func allFiles(under root: URL) throws -> [FileNode] {
+        var files: [FileNode] = []
+        try appendFiles(under: root, into: &files)
+        return files
+    }
+
+    private func appendFiles(under directory: URL, into files: inout [FileNode]) throws {
+        guard !Task.isCancelled else { throw CancellationError() }
+        for node in try children(of: directory) {
+            if node.isDirectory {
+                try appendFiles(under: node.url, into: &files)
+            } else {
+                files.append(node)
+            }
+        }
+    }
+
     func readDocument(at url: URL) throws -> DocumentContent {
         let values = try url.resourceValues(
             forKeys: [.fileSizeKey, .isRegularFileKey, .contentModificationDateKey]

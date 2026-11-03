@@ -37,6 +37,10 @@ public extension Notification.Name {
 
     /// Posted by the ⌘1…⌘9 key monitor with a 0-based tab index.
     static let selectTab = Notification.Name("\(AppInfo.bundleID).selectTab")
+
+    /// Posted by the View menu's Go to File command; the workspace detail view
+    /// toggles the quick-open panel.
+    static let quickOpen = Notification.Name("\(AppInfo.bundleID).quickOpen")
 }
 
 /// Weak holder for the app's main window, filled in by WindowChrome's

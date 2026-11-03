@@ -191,6 +191,8 @@ private struct WorkspaceDetailView: View {
     /// content starts at the window's leading edge.
     let sidebarLeadingInset: CGFloat
 
+    @State private var isQuickOpenPresented = false
+
     private var title: String {
         session.selectedTab?.name ?? workspace.name
     }
@@ -204,6 +206,16 @@ private struct WorkspaceDetailView: View {
                     .accessibilityHidden(hasOverlay)
                     .allowsHitTesting(!hasOverlay)
                 overlay
+                if isQuickOpenPresented {
+                    QuickOpenView(
+                        root: workspace.url,
+                        onOpen: { url in
+                            dismissQuickOpen()
+                            session.open(FileNode(url: url, isDirectory: false))
+                        },
+                        onDismiss: dismissQuickOpen
+                    )
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -222,6 +234,18 @@ private struct WorkspaceDetailView: View {
                   session.tabs.indices.contains(index) else { return }
             session.select(session.tabs[index])
         }
+        .onReceive(NotificationCenter.default.publisher(for: .quickOpen)) { _ in
+            if isQuickOpenPresented {
+                dismissQuickOpen()
+            } else {
+                isQuickOpenPresented = true
+            }
+        }
+        // The panel indexes the workspace it opened on; a different selection
+        // starts from a clean slate instead of searching the old root.
+        .onChange(of: workspace.id) { _, _ in
+            dismissQuickOpen()
+        }
         .sheet(item: diffRequestBinding) { request in
             GitDiffSheet(
                 request: request,
@@ -238,6 +262,14 @@ private struct WorkspaceDetailView: View {
             get: { session.requestDiff },
             set: { session.requestDiff = $0 }
         )
+    }
+
+    /// Resigns the search field before the panel unmounts, so the field editor
+    /// never dangles on a view that is leaving the hierarchy.
+    private func dismissQuickOpen() {
+        guard isQuickOpenPresented else { return }
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        isQuickOpenPresented = false
     }
 
     /// The window has no toolbar: tabs and actions live in one strip at the

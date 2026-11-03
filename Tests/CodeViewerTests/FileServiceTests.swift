@@ -72,6 +72,49 @@ struct FileServiceTests {
         } catch {}
     }
 
+    // MARK: - All files (quick open)
+
+    @Test("allFiles lists every file recursively; .git and .DS_Store go, dot-files stay")
+    func allFilesWalksRecursively() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: root.appendingPathComponent("One"), withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: root.appendingPathComponent("Two/deep"), withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: root.appendingPathComponent("Zeta"), withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: root.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        for relative in ["One/inner.txt", "Two/deep/deeper.txt", "Zeta/alpha.md", ".gitignore", ".DS_Store", "top.txt", ".git/config"] {
+            try "x".write(to: root.appendingPathComponent(relative), atomically: true, encoding: .utf8)
+        }
+
+        let files = try await FileService().allFiles(under: root)
+        let names = Set(files.map(\.name))
+
+        #expect(names == ["inner.txt", "deeper.txt", "alpha.md", ".gitignore", "top.txt"])
+        #expect(files.allSatisfy { !$0.isDirectory })
+    }
+
+    @Test("allFiles does not follow symlinked directories")
+    func allFilesSkipsSymlinkedDirectories() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let fileManager = FileManager.default
+        // The link points at the workspace root itself: following it would
+        // loop forever, not following it yields exactly one file entry.
+        try fileManager.createSymbolicLink(
+            at: root.appendingPathComponent("link"),
+            withDestinationURL: root
+        )
+
+        let files = try await FileService().allFiles(under: root)
+        let names = Set(files.map(\.name))
+
+        #expect(names == ["link"])
+        #expect(files.allSatisfy { !$0.isDirectory })
+    }
+
     // MARK: - Reading
 
     @Test("UTF-8 text is decoded")

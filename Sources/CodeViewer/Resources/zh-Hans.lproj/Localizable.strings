@@ -65,3 +65,8 @@
 "Solarized Dark" = "Solarized Dark";
 "Tokyo Night" = "Tokyo Night";
 "VS Dark" = "VS Dark";
+
+// Quick open
+"Go to File…" = "转到文件…";
+"Search files…" = "搜索文件…";
+"No matching files" = "没有匹配的文件";

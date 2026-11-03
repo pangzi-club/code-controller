@@ -258,6 +258,7 @@ private struct EditorPane: View {
 /// rebindable.
 private struct ShortcutsPane: View {
     private static let rows: [(keys: String, actionKey: String)] = [
+        ("⌘P", "Go to File…"),
         ("⌘W", "Close Tab"),
         ("⌘1…⌘9", "Select Tab"),
         ("⌃⌘S", "Toggle Sidebar"),

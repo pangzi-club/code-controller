@@ -65,3 +65,8 @@
 "Solarized Dark" = "Solarized Dark";
 "Tokyo Night" = "Tokyo Night";
 "VS Dark" = "VS Dark";
+
+// Quick open
+"Go to File…" = "Go to File…";
+"Search files…" = "Search files…";
+"No matching files" = "No matching files";

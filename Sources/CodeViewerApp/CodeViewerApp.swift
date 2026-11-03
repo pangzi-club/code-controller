@@ -41,6 +41,13 @@ struct CodeViewerApp: App {
                     NotificationCenter.default.post(name: .refreshWorkspace, object: nil)
                 }
                 .keyboardShortcut("r", modifiers: .command)
+
+                Divider()
+
+                Button(l10nString("Go to File…")) {
+                    NotificationCenter.default.post(name: .quickOpen, object: nil)
+                }
+                .keyboardShortcut("p", modifiers: .command)
             }
         }
 
