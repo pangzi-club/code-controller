@@ -196,6 +196,12 @@ struct QuickOpenView: View {
 
     private var list: some View {
         let currentMatches = matches
+        // Rows are fixed (24pt + 1pt spacing) inside 4pt container padding, so
+        // the scroll view is sized to hug the results exactly until they pass
+        // the 380pt cap. A taller scroll view centers its content and leaves a
+        // dead band above the first row; fixedSize on a ScrollView does not
+        // reliably hug, so the height comes from the row math instead.
+        let listHeight = min(CGFloat(currentMatches.count) * 25 + 7, 380)
         return ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 1) {
@@ -209,13 +215,9 @@ struct QuickOpenView: View {
                     }
                 }
                 .padding(4)
+                .frame(maxWidth: .infinity)
             }
-            // Grow with the result count but stop — and start scrolling — at
-            // 380pt. fixedSize first so a short list does not leave a blank
-            // half of panel; non-lazy VStack because lazy stacks have no
-            // reliable ideal height for the fit-to-content sizing.
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxHeight: 380)
+            .frame(height: listHeight)
             .onChange(of: selectedIndex) { _, newIndex in
                 proxy.scrollTo(newIndex, anchor: .center)
             }
