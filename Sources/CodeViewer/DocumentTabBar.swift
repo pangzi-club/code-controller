@@ -116,13 +116,30 @@ struct DocumentTabBar: View {
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .frame(height: 38)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(isSelected ? Color.primary.opacity(0.09)
-                    : isHovered ? Color.primary.opacity(0.045)
-                    : Color.clear)
-        )
+        .frame(height: TabRowsLayout.tabHeight)
+        .background {
+            // Only the selected tab gets an outline; unselected tabs keep a
+            // transparent one so the strip stays calm. strokeBorder draws
+            // inside the shape, so the tab's height and spacing are untouched.
+            let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+            ZStack(alignment: .top) {
+                shape.fill(
+                    isSelected ? Color.primary.opacity(0.09)
+                        : isHovered ? Color.primary.opacity(0.045)
+                        : Color.clear
+                )
+                shape.strokeBorder(
+                    isSelected ? Color.primary.opacity(0.15) : Color.clear,
+                    lineWidth: 1
+                )
+                if isSelected {
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(height: 2)
+                }
+            }
+            .clipShape(shape)
+        }
         .contentShape(Rectangle())
         .onHover { hovering in
             hoveredTabID = hovering ? tab.id : nil
