@@ -220,11 +220,17 @@ for ARCH in "${ARCH_LIST[@]}"; do
     fi
     echo "    binary architectures: $BINARY_ARCHS"
 
-    # Bundle.module resolves this resource bundle from the library target's
-    # Resources directory (the binary target name differs from the library's).
-    RESOURCE_BUNDLE="$(ls -d "$BIN_DIR/${PACKAGE_NAME}_"*.bundle 2>/dev/null | head -1)"
-    [[ -n "$RESOURCE_BUNDLE" ]] || die "resource bundle not found in $BIN_DIR"
-    cp -R "$RESOURCE_BUNDLE" "$CONTENTS/Resources/"
+    # Bundle.module resolves resource bundles from the executable's
+    # Contents/Resources. Every SwiftPM target with resources gets one — the
+    # app's own and one per dependency (e.g. Highlighter_Highlighter) — copy
+    # them all or a dependency's Bundle.module fatals on first use.
+    shopt -s nullglob
+    RESOURCE_BUNDLES=("$BIN_DIR/"*.bundle)
+    shopt -u nullglob
+    [[ ${#RESOURCE_BUNDLES[@]} -gt 0 ]] || die "resource bundles not found in $BIN_DIR"
+    for RESOURCE_BUNDLE in "${RESOURCE_BUNDLES[@]}"; do
+        cp -R "$RESOURCE_BUNDLE" "$CONTENTS/Resources/"
+    done
     # App Store validation reads the manifest from the app bundle's resource root;
     # the copy inside the SwiftPM resource bundle alone is not enough.
     cp "$PRIVACY_MANIFEST" "$CONTENTS/Resources/PrivacyInfo.xcprivacy"
