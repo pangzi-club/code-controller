@@ -344,8 +344,8 @@ private struct FileDiffSection: View {
             return Text(highlighted)
         }
         var plain = AttributedString(text)
-        plain.appKit.font = font.nsFont
-        plain.appKit.foregroundColor = kind == .meta ? NSColor.tertiaryLabelColor : NSColor.labelColor
+        plain.font = Font(font.nsFont)
+        plain.foregroundColor = kind == .meta ? Color(nsColor: .tertiaryLabelColor) : Color(nsColor: .labelColor)
         let line = Text(plain)
         return kind == .meta ? line.italic() : line
     }
