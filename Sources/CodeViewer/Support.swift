@@ -30,6 +30,30 @@ public extension Notification.Name {
     /// Posted by the View menu's Refresh command; the workspace detail view
     /// reloads the tree, git statuses and the selected document.
     static let refreshWorkspace = Notification.Name("\(AppInfo.bundleID).refreshWorkspace")
+
+    /// Posted by the ⌘W key monitor: close the selected tab. With no tabs
+    /// open the event falls through and the system closes the window.
+    static let closeCurrentTab = Notification.Name("\(AppInfo.bundleID).closeCurrentTab")
+
+    /// Posted by the ⌘1…⌘9 key monitor with a 0-based tab index.
+    static let selectTab = Notification.Name("\(AppInfo.bundleID).selectTab")
+}
+
+/// Weak holder for the app's main window, filled in by WindowChrome's
+/// tracking view. The tab key monitor uses it to tell the main window from
+/// the Settings window, which keeps the system ⌘W.
+@MainActor
+enum MainWindowTracker {
+    private static weak var window: NSWindow?
+
+    static var isCurrentKey: Bool {
+        guard let window else { return false }
+        return window === NSApp.keyWindow
+    }
+
+    static func set(_ window: NSWindow?) {
+        self.window = window
+    }
 }
 
 /// SF Symbol per file type, shared by the tree and the tab strip.

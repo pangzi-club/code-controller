@@ -10,6 +10,7 @@ public struct ContentView: View {
     @State private var chromeStripHeight: CGFloat = 28
     @State private var isFullScreen = false
     @State private var isChoosingWorkspace = false
+    @State private var keyMonitor: Any?
 
     public init() {}
 
@@ -50,7 +51,10 @@ public struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
             toggleSidebar()
         }
-        .onAppear(perform: selectInitialWorkspaceIfNeeded)
+        .onAppear {
+            installTabKeyMonitor()
+            selectInitialWorkspaceIfNeeded()
+        }
         .fileImporter(
             isPresented: $isChoosingWorkspace,
             allowedContentTypes: [.folder]
@@ -125,6 +129,48 @@ public struct ContentView: View {
         }
     }
 
+    /// Local key monitor for tab commands: ⌘W always closes a tab — with no
+    /// tabs open it deliberately does nothing, so it never surprises by
+    /// closing the whole window (use the traffic light or ⌘⇧W for that).
+    /// ⌘1…⌘9 select the tab at that position. Runs only while the main
+    /// window is key, so Settings keeps its own system shortcuts.
+    ///
+    /// Keys match by ANSI keycode, and only ⇧⌃⌥ are rejected as extra
+    /// modifiers: caps lock stamps `.alphaShift` on real key events and
+    /// uppercases the characters, so a strict flags equality or a `"w"`
+    /// character match silently misses a physical ⌘W and the system closes
+    /// the window instead.
+    private func installTabKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let relevant = event.modifierFlags.intersection([.shift, .control, .option, .command])
+            guard MainWindowTracker.isCurrentKey,
+                  event.window === NSApp.keyWindow,
+                  relevant == .command else {
+                return event
+            }
+
+            let digitByANSIKeycode: [UInt16: Int] = [
+                18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9,
+            ]
+            switch event.keyCode {
+            case 13:  // W
+                NotificationCenter.default.post(name: .closeCurrentTab, object: nil)
+                return nil
+            case let code where digitByANSIKeycode[code] != nil:
+                let digit = digitByANSIKeycode[code]!
+                NotificationCenter.default.post(
+                    name: .selectTab,
+                    object: nil,
+                    userInfo: ["index": digit - 1]
+                )
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
     /// The window has no toolbar, so the top safe area is just the traffic-light
     /// strip. It can report 0 while full screen, so the sidebar falls back to
     /// the 28pt titlebar height instead of collapsing onto the buttons.
@@ -165,6 +211,15 @@ private struct WorkspaceDetailView: View {
         .navigationTitle(title)
         .onReceive(NotificationCenter.default.publisher(for: .refreshWorkspace)) { _ in
             Task { await session.refresh() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closeCurrentTab)) { _ in
+            guard let selectedTab = session.selectedTab else { return }
+            session.close(selectedTab)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .selectTab)) { note in
+            guard let index = note.userInfo?["index"] as? Int,
+                  session.tabs.indices.contains(index) else { return }
+            session.select(session.tabs[index])
         }
         .sheet(item: diffRequestBinding) { request in
             GitDiffSheet(
@@ -360,6 +415,7 @@ private struct WindowChrome: NSViewRepresentable {
     func makeNSView(context: Context) -> WindowTrackingView {
         let view = WindowTrackingView()
         view.onWindowChange = { [weak coordinator = context.coordinator] window in
+            MainWindowTracker.set(window)
             coordinator?.attach(to: window)
         }
         return view
