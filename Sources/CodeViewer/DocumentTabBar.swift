@@ -11,12 +11,12 @@ struct DocumentTabBar: View {
 
     @State private var hoveredTabID: DocumentTab.ID?
     @State private var viewportWidth: CGFloat = 0
-    @State private var contentHeight = Self.minimumHeight
+    @State private var rowCount = 1
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                TabRowsLayout(containerWidth: availableRowWidth) {
+                TabRowsLayout(containerWidth: availableRowWidth, onRowCountChange: updateRowCount) {
                     ForEach(tabs) { tab in
                         tabView(tab)
                             .id(tab.id)
@@ -24,14 +24,6 @@ struct DocumentTabBar: View {
                 }
                 .padding(.horizontal, Self.horizontalPadding)
                 .padding(.vertical, Self.verticalPadding)
-                .background(
-                    GeometryReader { geometry in
-                        Color.clear.preference(
-                            key: TabContentHeightKey.self,
-                            value: geometry.size.height
-                        )
-                    }
-                )
                 .background(TabVerticalScrollLock())
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -50,26 +42,33 @@ struct DocumentTabBar: View {
                 }
             }
         }
-        .frame(height: max(Self.minimumHeight, contentHeight))
+        .frame(height: Self.height(forRows: rowCount))
         .onPreferenceChange(TabViewportWidthKey.self) { width in
             viewportWidth = width
         }
-        .onPreferenceChange(TabContentHeightKey.self) { height in
-            contentHeight = height
-        }
         .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
     }
 
     private static let horizontalPadding: CGFloat = 8
     private static let verticalPadding: CGFloat = 4
-    private static let minimumHeight = TabRowsLayout.tabHeight + verticalPadding * 2
+
+    private static func height(forRows rows: Int) -> CGFloat {
+        CGFloat(rows) * TabRowsLayout.tabHeight
+            + CGFloat(max(0, rows - 1)) * TabRowsLayout.defaultRowSpacing
+            + verticalPadding * 2
+    }
 
     private var availableRowWidth: CGFloat {
         guard viewportWidth > 0 else { return .infinity }
         return max(1, viewportWidth - Self.horizontalPadding * 2)
+    }
+
+    private func updateRowCount(_ rows: Int) {
+        guard rows != rowCount else { return }
+        DispatchQueue.main.async {
+            guard rows != rowCount else { return }
+            rowCount = rows
+        }
     }
 
     private func tabView(_ tab: DocumentTab) -> some View {
@@ -152,24 +151,18 @@ private struct TabViewportWidthKey: PreferenceKey {
     }
 }
 
-private struct TabContentHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
 /// Flow layout capped at two rows. Tabs keep their ideal width while the
 /// strip has room; once more than two rows would be needed, all tabs share
 /// the width that fits two rows (down to their 80pt minimum), and the strip
 /// scrolls horizontally for whatever still does not fit.
 private struct TabRowsLayout: Layout {
     let containerWidth: CGFloat
+    let onRowCountChange: (Int) -> Void
     var spacing: CGFloat = 2
-    var rowSpacing: CGFloat = 4
+    var rowSpacing = Self.defaultRowSpacing
 
     static let tabHeight: CGFloat = 38
+    static let defaultRowSpacing: CGFloat = 4
 
     struct Plan {
         var widths: [CGFloat]
@@ -178,7 +171,9 @@ private struct TabRowsLayout: Layout {
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        plan(for: subviews).size
+        let plan = plan(for: subviews)
+        onRowCountChange(plan.rows.count)
+        return plan.size
     }
 
     func placeSubviews(
