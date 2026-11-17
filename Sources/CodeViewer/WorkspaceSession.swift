@@ -127,6 +127,47 @@ final class WorkspaceSession {
         }
     }
 
+    // MARK: Bulk closes (tab strip context menu)
+
+    /// Closes every tab except `anchor`, which becomes the selection.
+    func closeOthers(keeping anchor: DocumentTab) {
+        guard tabs.contains(where: { $0.id == anchor.id }) else { return }
+        tabs = [anchor]
+        selectedTabID = anchor.id
+    }
+
+    /// Closes every tab left of `anchor`. If the selection was among the
+    /// closed tabs it moves to `anchor`; otherwise it is kept.
+    func closeTabsToLeft(of anchor: DocumentTab) {
+        guard let index = tabs.firstIndex(where: { $0.id == anchor.id }), index > 0 else { return }
+        let selectionSurvives = !selectionWasIn(0..<index)
+        tabs.removeSubrange(0..<index)
+        if !selectionSurvives {
+            selectedTabID = anchor.id
+        }
+    }
+
+    /// Closes every tab right of `anchor`. If the selection was among the
+    /// closed tabs it moves to `anchor`; otherwise it is kept.
+    func closeTabsToRight(of anchor: DocumentTab) {
+        guard let index = tabs.firstIndex(where: { $0.id == anchor.id }),
+              index < tabs.count - 1 else { return }
+        let selectionSurvives = !selectionWasIn(tabs.index(after: index)..<tabs.count)
+        tabs.removeSubrange(tabs.index(after: index)..<tabs.count)
+        if !selectionSurvives {
+            selectedTabID = anchor.id
+        }
+    }
+
+    /// Whether the current selection sits inside the closing range.
+    private func selectionWasIn(_ range: Range<Int>) -> Bool {
+        guard let selectedTabID,
+              let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else {
+            return false
+        }
+        return range.contains(index)
+    }
+
     func reloadSelectedDocument() {
         guard let tab = selectedTab else { return }
         if case .file(_, let document) = tab.content {

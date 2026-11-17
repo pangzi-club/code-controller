@@ -14,6 +14,9 @@
 "Show in Finder" = "Show in Finder";
 "Open" = "Open";
 "Close Tab" = "Close Tab";
+"Close Other Tabs" = "Close Other Tabs";
+"Close Tabs to the Left" = "Close Tabs to the Left";
+"Close Tabs to the Right" = "Close Tabs to the Right";
 "Close" = "Close";
 "Refresh" = "Refresh";
 "Refresh Workspace" = "Refresh Workspace";

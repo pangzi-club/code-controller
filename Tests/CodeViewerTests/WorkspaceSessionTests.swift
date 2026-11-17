@@ -201,6 +201,119 @@ struct WorkspaceSessionTests {
         #expect(session.selectedTab?.id == "diff:commit:def456")
     }
 
+    @Test("closing left of a middle tab keeps it and keeps a right-side selection")
+    func closesTabsToLeftKeepingSelection() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+        let first = try makeNode("A.swift", in: root)
+        let second = try makeNode("B.swift", in: root)
+        let third = try makeNode("C.swift", in: root)
+
+        session.open(first)
+        session.open(second)
+        session.open(third)
+        session.select(session.tabs[2])
+        session.closeTabsToLeft(of: session.tabs[1])
+
+        #expect(session.tabs.compactMap(\.url) == [second.url, third.url])
+        #expect(session.selectedTab?.url == third.url)
+    }
+
+    @Test("closing left of the tab holding the selection moves the selection onto it")
+    func closesTabsToLeftMovesSelection() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+        let first = try makeNode("A.swift", in: root)
+        let second = try makeNode("B.swift", in: root)
+        let third = try makeNode("C.swift", in: root)
+
+        session.open(first)
+        session.open(second)
+        session.open(third)
+        session.select(session.tabs[0])
+        session.closeTabsToLeft(of: session.tabs[1])
+
+        #expect(session.tabs.compactMap(\.url) == [second.url, third.url])
+        #expect(session.selectedTab?.url == second.url)
+    }
+
+    @Test("closing right of a middle tab keeps it and keeps a left-side selection")
+    func closesTabsToRightKeepingSelection() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+        let first = try makeNode("A.swift", in: root)
+        let second = try makeNode("B.swift", in: root)
+        let third = try makeNode("C.swift", in: root)
+
+        session.open(first)
+        session.open(second)
+        session.open(third)
+        session.select(session.tabs[0])
+        session.closeTabsToRight(of: session.tabs[1])
+
+        #expect(session.tabs.compactMap(\.url) == [first.url, second.url])
+        #expect(session.selectedTab?.url == first.url)
+    }
+
+    @Test("closing right of the tab holding the selection moves the selection onto it")
+    func closesTabsToRightMovesSelection() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+        let first = try makeNode("A.swift", in: root)
+        let second = try makeNode("B.swift", in: root)
+        let third = try makeNode("C.swift", in: root)
+
+        session.open(first)
+        session.open(second)
+        session.open(third)
+        session.select(session.tabs[2])
+        session.closeTabsToRight(of: session.tabs[1])
+
+        #expect(session.tabs.compactMap(\.url) == [first.url, second.url])
+        #expect(session.selectedTab?.url == second.url)
+    }
+
+    @Test("close-others keeps only the anchor and selects it")
+    func closesOtherTabs() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+        let first = try makeNode("A.swift", in: root)
+        let second = try makeNode("B.swift", in: root)
+
+        session.open(first)
+        session.open(second)
+        session.closeOthers(keeping: session.tabs[0])
+
+        #expect(session.tabs.compactMap(\.url) == [first.url])
+        #expect(session.selectedTab?.url == first.url)
+    }
+
+    @Test("closing left of the first or right of the last tab does nothing")
+    func closesNothingAtTheEdges() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+        let first = try makeNode("A.swift", in: root)
+        let second = try makeNode("B.swift", in: root)
+
+        session.open(first)
+        session.open(second)
+        session.select(session.tabs[1])
+
+        session.closeTabsToLeft(of: session.tabs[0])
+        #expect(session.tabs.compactMap(\.url) == [first.url, second.url])
+        #expect(session.selectedTab?.url == second.url)
+
+        session.closeTabsToRight(of: session.tabs[1])
+        #expect(session.tabs.compactMap(\.url) == [first.url, second.url])
+        #expect(session.selectedTab?.url == second.url)
+    }
+
     @Test("a commit diff tab can be closed like a file tab")
     func closesCommitDiffTab() throws {
         let root = try makeWorkspace()

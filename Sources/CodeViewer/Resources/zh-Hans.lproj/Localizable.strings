@@ -14,6 +14,9 @@
 "Show in Finder" = "在 Finder 中显示";
 "Open" = "打开";
 "Close Tab" = "关闭标签页";
+"Close Other Tabs" = "关闭其他标签页";
+"Close Tabs to the Left" = "关闭左侧标签页";
+"Close Tabs to the Right" = "关闭右侧标签页";
 "Close" = "关闭";
 "Refresh" = "刷新";
 "Refresh Workspace" = "刷新工作区";

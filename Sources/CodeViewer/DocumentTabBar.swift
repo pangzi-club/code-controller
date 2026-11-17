@@ -9,6 +9,9 @@ struct DocumentTabBar: View {
     let git: GitStatusStore
     let onSelect: (DocumentTab) -> Void
     let onClose: (DocumentTab) -> Void
+    let onCloseOthers: (DocumentTab) -> Void
+    let onCloseToLeft: (DocumentTab) -> Void
+    let onCloseToRight: (DocumentTab) -> Void
 
     @State private var hoveredTabID: DocumentTab.ID?
     @State private var viewportWidth: CGFloat = 0
@@ -170,6 +173,22 @@ struct DocumentTabBar: View {
             } label: {
                 l10n("Close Tab")
             }
+            Button {
+                onCloseOthers(tab)
+            } label: {
+                l10n("Close Other Tabs")
+            }
+            Button {
+                onCloseToLeft(tab)
+            } label: {
+                l10n("Close Tabs to the Left")
+            }
+            Button {
+                onCloseToRight(tab)
+            } label: {
+                l10n("Close Tabs to the Right")
+            }
+            Divider()
             if let url = tab.url {
                 Button {
                     FileOpener.reveal(url)

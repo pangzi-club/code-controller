@@ -268,7 +268,10 @@ private struct WorkspaceDetailView: View {
                         selectedTabID: session.selectedTabID,
                         git: session.git,
                         onSelect: { session.select($0) },
-                        onClose: { session.close($0) }
+                        onClose: { session.close($0) },
+                        onCloseOthers: { session.closeOthers(keeping: $0) },
+                        onCloseToLeft: { session.closeTabsToLeft(of: $0) },
+                        onCloseToRight: { session.closeTabsToRight(of: $0) }
                     )
                 }
             }
