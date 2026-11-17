@@ -142,6 +142,58 @@ struct GitServiceTests {
         try? FileManager.default.removeItem(at: repo)
     }
 
+    @Test("live working-tree edits map to editor line marks")
+    func liveLineChanges() async throws {
+        let repo = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: repo.appendingPathComponent(".git", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        guard let git = await gitBinary() else {
+            Issue.record("git is unavailable; cannot run the live line-mark test")
+            return
+        }
+        let path = repo.appendingPathComponent("notes.txt")
+        try run(git, arguments: ["init", "-q", repo.path])
+        try Data("one\ntwo\nthree\n".utf8).write(to: path)
+        try run(git, arguments: ["-C", repo.path, "add", "notes.txt"])
+        try run(git, arguments: [
+            "-C", repo.path,
+            "-c", "user.name=Test", "-c", "user.email=test@example.com",
+            "commit", "-q", "-m", "initial",
+        ])
+
+        // Line 2 rewritten, two lines appended.
+        try Data("one\nTWO\nthree\nfour\nfive\n".utf8).write(to: path)
+        let modified = await service.lineChanges(
+            root: repo,
+            relativePath: "notes.txt",
+            status: .modified
+        )
+
+        #expect(modified.kinds[2] == .modified)
+        #expect(modified.kinds[4] == .added)
+        #expect(modified.kinds[5] == .added)
+        #expect(modified.deletionBoundaries.isEmpty)
+
+        let untracked = await service.lineChanges(
+            root: repo,
+            relativePath: "fresh.txt",
+            status: .untracked
+        )
+        #expect(untracked.isNewFile)
+
+        let clean = await service.lineChanges(
+            root: repo,
+            relativePath: "notes.txt",
+            status: nil
+        )
+        #expect(clean.isEmpty)
+
+        try? FileManager.default.removeItem(at: repo)
+    }
+
     // MARK: Helpers
 
     private func gitBinary() async -> String? {
@@ -179,5 +231,73 @@ struct GitStatusStoreTests {
         #expect(!store.isRefreshing)
 
         try? FileManager.default.removeItem(at: outside)
+    }
+
+    @Test("editor marks follow the working tree of the open files")
+    func refreshesLineChanges() async throws {
+        let repo = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: repo.appendingPathComponent(".git", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        guard let git = Self.gitBinary() else {
+            Issue.record("git is unavailable; cannot run the live store test")
+            return
+        }
+        let tracked = repo.appendingPathComponent("notes.txt")
+        let nested = repo.appendingPathComponent("fresh/inside.txt")
+        try Self.run(git, arguments: ["init", "-q", repo.path])
+        try Data("one\ntwo\nthree\n".utf8).write(to: tracked)
+        try Self.run(git, arguments: ["-C", repo.path, "add", "notes.txt"])
+        try Self.run(git, arguments: [
+            "-C", repo.path,
+            "-c", "user.name=Test", "-c", "user.email=test@example.com",
+            "commit", "-q", "-m", "initial",
+        ])
+        try Data("one\nTWO\nthree\n".utf8).write(to: tracked)
+        try FileManager.default.createDirectory(
+            at: nested.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("new\n".utf8).write(to: nested)
+
+        let store = GitStatusStore()
+        await store.refresh(workspaceURL: repo)
+        await store.refreshLineChanges(for: [tracked, nested])
+
+        #expect(store.lineChanges(for: tracked)?.kinds == [2: .modified])
+        // `git status` collapses an untracked directory, and the file inside
+        // it still reads as new top to bottom.
+        #expect(store.status(for: nested) == nil)
+        #expect(store.lineChanges(for: nested)?.isNewFile == true)
+
+        // A revert drops the marks on the next refresh instead of leaving
+        // stale tints behind.
+        try Data("one\ntwo\nthree\n".utf8).write(to: tracked)
+        await store.refresh(workspaceURL: repo)
+        await store.refreshLineChanges(for: [tracked])
+        #expect(store.lineChanges(for: tracked) == nil)
+        #expect(store.lineChanges(for: nested) == nil)
+
+        try? FileManager.default.removeItem(at: repo)
+    }
+
+    // MARK: Helpers
+
+    private static func gitBinary() -> String? {
+        let candidates = ["/opt/homebrew/bin/git", "/usr/local/bin/git", "/usr/bin/git"]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    private static func run(_ path: String, arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0, "git \(arguments.joined(separator: " ")) failed")
     }
 }

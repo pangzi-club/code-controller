@@ -16,6 +16,9 @@ struct CodePane: NSViewRepresentable {
     /// Canonical highlight.js language for the file extension, or nil to
     /// render plain text.
     let language: String?
+    /// Working-tree change marks for this file; the editor tints the changed
+    /// lines the way the commit diff tints its rows.
+    var lineChanges: LineChangeMap = .empty
     let theme: HighlightTheme
     var font: EditorFont = .default
 
@@ -36,6 +39,7 @@ struct CodePane: NSViewRepresentable {
             text: text,
             documentID: documentID,
             language: language,
+            lineChanges: lineChanges,
             theme: theme,
             font: font
         )
@@ -79,6 +83,7 @@ struct CodePane: NSViewRepresentable {
             text: String?,
             documentID: String?,
             language: String?,
+            lineChanges: LineChangeMap,
             theme: HighlightTheme,
             font: EditorFont
         ) {
@@ -134,6 +139,10 @@ struct CodePane: NSViewRepresentable {
             }
 
             show(entries[tabID]!, tabID: tabID, in: container)
+
+            // Marks ride on top of whichever paint is showing (plain or
+            // highlighted), so a cached paint still gets this file's tints.
+            entries[tabID]?.editorView.setLineChanges(lineChanges)
 
             if let savedState, let entry = entries[tabID] {
                 restore(savedState, in: entry)
@@ -294,6 +303,9 @@ final class CodeEditorView: NSView {
     private var font: EditorFont
     private let lineNumberView: LineNumberRulerView
     private var lineNumberWidthConstraint: NSLayoutConstraint!
+    /// Change marks currently painted on the text; the ruler keeps its own
+    /// copy for the gutter markers.
+    private(set) var lineChanges = LineChangeMap.empty
 
     init(font: EditorFont = .default) {
         self.font = font
@@ -372,6 +384,37 @@ final class CodeEditorView: NSView {
     func setAttributedText(_ attributed: NSAttributedString) {
         textView.textStorage?.setAttributedString(attributed)
         lineNumberView.update(text: attributed.string)
+        // Fresh storage carries no backgrounds (the pane's styled output
+        // strips the highlighter's), so the change tints are painted straight
+        // on top — a background never affects the metrics the ruler needs.
+        paintLineTints()
+    }
+
+    /// Updates the working-tree change marks. Equality is the guard: SwiftUI
+    /// re-renders the pane on unrelated updates, and rewriting thousands of
+    /// background attributes is only worth it when the marks moved.
+    func setLineChanges(_ changes: LineChangeMap) {
+        guard changes != lineChanges else { return }
+        lineChanges = changes
+        lineNumberView.lineChanges = changes
+        if let storage = textView.textStorage {
+            storage.removeAttribute(
+                .backgroundColor,
+                range: NSRange(location: 0, length: storage.length)
+            )
+        }
+        paintLineTints()
+    }
+
+    private func paintLineTints() {
+        guard let storage = textView.textStorage, !lineChanges.isEmpty else { return }
+        for (kind, range) in lineChanges.tintedRanges(in: storage.string as NSString) {
+            storage.addAttribute(
+                .backgroundColor,
+                value: LineChangePalette.background(for: kind),
+                range: range
+            )
+        }
     }
 }
 
@@ -465,8 +508,11 @@ enum CodeTextFactory {
 
     static func paragraphStyle(_ font: EditorFont) -> NSParagraphStyle {
         // The line height is pinned through minimum/maximumLineHeight so the
-        // ruler can place line numbers without querying TextKit layout.
-        let lineHeight = font.lineHeight
+        // ruler can place line numbers without querying TextKit layout. Pin
+        // `pinnedLineHeight`, not `lineHeight`: the latter is what TextKit
+        // rounds that pin up to, and pinning it would add the font's leading a
+        // second time.
+        let lineHeight = font.pinnedLineHeight
         let style = NSMutableParagraphStyle()
         style.minimumLineHeight = lineHeight
         style.maximumLineHeight = lineHeight

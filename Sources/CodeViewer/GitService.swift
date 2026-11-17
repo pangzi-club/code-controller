@@ -151,6 +151,54 @@ actor GitService {
         ])
     }
 
+    /// Marker for the editor's line tints: which of a file's current lines
+    /// differ from HEAD, and where blocks were removed outright. Untracked
+    /// files are new top to bottom; clean and deleted files carry no marks.
+    func lineChanges(root: URL, relativePath: String, status: GitFileStatus?) -> LineChangeMap {
+        switch status {
+        case .none, .deleted:
+            return .empty
+        case .untracked:
+            return LineChangeMap(isNewFile: true)
+        case .added, .modified:
+            break
+        }
+        guard let output = workingTreeDiff(root: root, path: relativePath),
+              let file = UnifiedDiffParser.parse(output).first else {
+            return .empty
+        }
+        return LineChangeMap(diff: file)
+    }
+
+    /// `git diff HEAD` for one path against the working tree, with no context
+    /// lines: the editor only needs the changed ranges, and a zero-context
+    /// diff of an untouched file is empty. Staged and unstaged changes both
+    /// count, so the marks describe the file as the user sees it.
+    func workingTreeDiff(root: URL, path: String) -> String? {
+        guard let git = resolveGit() else { return nil }
+        func arguments(against revision: String?) -> [String] {
+            var arguments = [
+                "-C", root.path, "diff", "--no-color", "--no-ext-diff", "--unified=0",
+            ]
+            if let revision {
+                arguments.append(revision)
+            }
+            arguments.append(contentsOf: ["--", path])
+            return arguments
+        }
+
+        if let output = run(git, arguments: arguments(against: "HEAD")) {
+            return output
+        }
+        // No commit yet: diff against the empty tree so a staged new file
+        // still reads as a whole-file addition.
+        return run(git, arguments: arguments(against: Self.emptyTreeHash))
+    }
+
+    /// Well-known hash of the empty tree; `HEAD` does not resolve in a
+    /// repository whose first commit does not exist yet.
+    private static let emptyTreeHash = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
     /// Parses `git status --porcelain=v1 -z` output. With `-z` paths arrive
     /// NUL-separated and never quoted, and rename records carry the original
     /// path as one extra NUL-terminated field.
@@ -242,9 +290,14 @@ final class GitStatusStore {
     private(set) var statuses: [URL: GitFileStatus] = [:]
     private(set) var commits: [GitCommit] = []
     private(set) var isRefreshing = false
+    /// Editor line marks for the open files, keyed by file URL. Rebuilt from
+    /// the working tree on every refresh, so clean files drop out instead of
+    /// leaving stale tints behind.
+    private(set) var lineChanges: [URL: LineChangeMap] = [:]
 
     private let service: GitService
     private var generation = 0
+    private var lineChangeGeneration = 0
 
     init(service: GitService = .shared) {
         self.service = service
@@ -256,6 +309,60 @@ final class GitStatusStore {
 
     func status(for url: URL) -> GitFileStatus? {
         statuses[url.standardizedFileURL]
+    }
+
+    /// Editor marks for one open file, or nil when it is clean.
+    func lineChanges(for url: URL) -> LineChangeMap? {
+        lineChanges[url.standardizedFileURL]
+    }
+
+    /// Recomputes the editor marks for exactly these files — normally every
+    /// open file tab — after `refresh` settled the statuses. A newer call
+    /// supersedes an older one, so a tab opened mid-refresh still ends up with
+    /// the marks for the current working tree.
+    func refreshLineChanges(for urls: [URL]) async {
+        lineChangeGeneration += 1
+        let run = lineChangeGeneration
+
+        guard let root = repositoryRoot else {
+            lineChanges = [:]
+            return
+        }
+
+        var fresh: [URL: LineChangeMap] = [:]
+        for url in urls {
+            let standardized = url.standardizedFileURL
+            guard let relativePath = relativePath(of: standardized, in: root),
+                  let status = resolvedStatus(for: standardized) else { continue }
+            let changes = await service.lineChanges(
+                root: root,
+                relativePath: relativePath,
+                status: status
+            )
+            guard run == lineChangeGeneration else { return }
+            if !changes.isEmpty {
+                fresh[standardized] = changes
+            }
+        }
+        lineChanges = fresh
+    }
+
+    /// The file's status, with files inside an untracked directory inheriting
+    /// it: `git status` collapses such a directory onto one entry, so its
+    /// files would otherwise look clean.
+    private func resolvedStatus(for url: URL) -> GitFileStatus? {
+        if let status = statuses[url] { return status }
+        let path = url.path
+        return statuses.first { directory, status in
+            status == .untracked && path.hasPrefix(directory.path + "/")
+        }?.value
+    }
+
+    /// Path relative to the repository root, for git's pathspec.
+    private func relativePath(of url: URL, in root: URL) -> String? {
+        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard url.path.hasPrefix(prefix) else { return nil }
+        return String(url.path.dropFirst(prefix.count))
     }
 
     /// Discovers the repository and loads statuses. A newer call supersedes

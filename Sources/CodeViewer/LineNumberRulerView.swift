@@ -21,6 +21,13 @@ final class LineNumberRulerView: NSView {
         didSet { needsDisplay = true }
     }
 
+    /// Working-tree change marks, drawn as bars at the trailing edge next to
+    /// the numbers: solid for added/modified lines, a seam marker where a
+    /// removed block used to sit.
+    var lineChanges = LineChangeMap.empty {
+        didSet { needsDisplay = true }
+    }
+
     private weak var textView: NSTextView?
     private weak var scrollView: NSScrollView?
     private var lineCount = 1
@@ -105,10 +112,13 @@ final class LineNumberRulerView: NSView {
         ]
 
         for line in firstLine...lastLine {
-            let y = textViewOrigin.y
-                + inset
-                + CGFloat(line) * lineHeight
-                + (lineHeight - numberHeight) / 2
+            let lineTop = textViewOrigin.y + inset + CGFloat(line) * lineHeight
+            drawChangeMarker(
+                for: lineChanges.kind(forLine: line + 1),
+                at: lineTop,
+                height: lineHeight
+            )
+            let y = lineTop + (lineHeight - numberHeight) / 2
             let numberRect = NSRect(
                 x: 0,
                 y: y,
@@ -117,5 +127,41 @@ final class LineNumberRulerView: NSView {
             )
             "\(line + 1)".draw(in: numberRect, withAttributes: attributes)
         }
+
+        for boundary in lineChanges.deletionBoundaries {
+            let y = textViewOrigin.y + inset + CGFloat(boundary - 1) * lineHeight
+            guard y >= dirtyRect.minY - 6, y <= dirtyRect.maxY + 6 else { continue }
+            drawDeletionSeam(at: y)
+        }
+    }
+
+    /// A 3pt bar in the padding right of the numbers, kept clear of the
+    /// digits' right edge and of the separator line.
+    private func drawChangeMarker(
+        for kind: LineChangeMap.Kind?,
+        at top: CGFloat,
+        height: CGFloat
+    ) {
+        guard let kind else { return }
+        LineChangePalette.marker(for: kind).setFill()
+        let rect = NSRect(
+            x: bounds.maxX - 4,
+            y: top + 1.5,
+            width: 3,
+            height: max(1, height - 3)
+        )
+        NSBezierPath(roundedRect: rect, xRadius: 1.5, yRadius: 1.5).fill()
+    }
+
+    /// A red triangle straddling the seam: `y` is where the removed block's
+    /// first line would have been drawn.
+    private func drawDeletionSeam(at y: CGFloat) {
+        LineChangePalette.deletionMarker.setFill()
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: bounds.maxX - 7, y: y - 2.5))
+        path.line(to: NSPoint(x: bounds.maxX - 1, y: y - 2.5))
+        path.line(to: NSPoint(x: bounds.maxX - 4, y: y + 2.5))
+        path.close()
+        path.fill()
     }
 }

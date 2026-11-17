@@ -39,6 +39,7 @@ final class WorkspaceSession {
         hasLoadedTree = true
         await tree.loadRoot()
         await git.refresh(workspaceURL: workspace.url)
+        await refreshLineChanges()
         startWatching()
     }
 
@@ -46,6 +47,7 @@ final class WorkspaceSession {
     func refresh() async {
         await tree.reload()
         await git.refresh(workspaceURL: workspace.url)
+        await refreshLineChanges()
         reloadSelectedDocument()
     }
 
@@ -56,12 +58,19 @@ final class WorkspaceSession {
         Task {
             await tree.reload()
             await git.refresh(workspaceURL: workspace.url)
+            await refreshLineChanges()
             for tab in tabs {
                 if case .file(_, let document) = tab.content {
                     document.reloadIfChanged()
                 }
             }
         }
+    }
+
+    /// Rebuilds the editor's diff marks for the open file tabs, so a file that
+    /// was edited (or just saved) shows the changed lines right away.
+    private func refreshLineChanges() async {
+        await git.refreshLineChanges(for: tabs.compactMap(\.url))
     }
 
     private func startWatching() {
@@ -88,6 +97,9 @@ final class WorkspaceSession {
         if case .file(_, let document) = tab.content {
             document.open(url: node.url)
         }
+        // A borrowed mark from an earlier tab would be wrong for this file, so
+        // the marks are rebuilt for every open tab.
+        Task { await refreshLineChanges() }
         Log.editor.notice("Open tab \(node.url.path)")
     }
 
@@ -117,6 +129,9 @@ final class WorkspaceSession {
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
         let wasSelected = selectedTabID == tab.id
         tabs.remove(at: index)
+        if tab.url != nil {
+            Task { await refreshLineChanges() }
+        }
         guard wasSelected else { return }
 
         // Prefer the tab that slid into this position, else the new last tab.

@@ -170,9 +170,14 @@ instead of a developer's home path.
   the clip view to y = 0 and sets `verticalScrollElasticity = .none`. Do not
   remove it; horizontal scrolling and `ScrollViewReader.scrollTo` still work.
 - The code pane's line-number ruler assumes one fixed line height:
-  `EditorFont.lineHeight` is pinned through `minimumLineHeight` /
-  `maximumLineHeight`, and the ruler derives visible lines from the scroll
-  offset instead of querying TextKit layout. The metric comes from the
+  `CodeTextFactory.paragraphStyle` pins `EditorFont.pinnedLineHeight`
+  (`defaultLineHeight + 2`, rounded) through `minimumLineHeight` /
+  `maximumLineHeight`, and `EditorFont.lineHeight` is the height TextKit
+  *actually* lays a line out at with that pin — measured once per font, not
+  derived, because fonts with fractional leading (Monaco at 12pt reports
+  16.002) come out a point taller than the metric and every ruler number then
+  drifts a point per line. The ruler derives visible lines from the scroll
+  offset instead of querying TextKit layout. Both values come from the
   settings' editor font (an `NSLayoutManager` query — main thread only, so
   every restyling path runs on the main actor). When the user changes font
   family or size, `CodeEditorView.applyFont` re-pins the paragraph style and
@@ -181,6 +186,20 @@ instead of a developer's home path.
   leading edge; do not attach it as an `NSRulerView` overlay. The code clip
   view therefore keeps a zero minimum scroll origin, and the two views cannot
   draw into the tab bar above them.
+- Working-tree line marks (`LineChangeMap`) are painted as `.backgroundColor`
+  attributes on the editor's text storage after the paint, never inside the
+  attributed string the highlighter produced: `CodeTextFactory.styled` strips
+  backgrounds, so the tints are the only ones in the storage and
+  `setLineChanges` can clear them wholesale before repainting. Backgrounds do
+  not affect metrics, so the ruler contract above still holds. Line numbers
+  come from `git diff HEAD --unified=0` (staged and unstaged both count); git
+  reports an empty new-side range as the line *before* a removal, so a removed
+  block's seam is `newStart + 1`. Untracked files are whole-file additions
+  rather than diffs, and so are files inside an untracked directory (git
+  status collapses such a directory to one row, so they carry no status of
+  their own). `GitStatusStore.refreshLineChanges` rebuilds the marks for every
+  open file tab on each status refresh, so a closed, reverted or staged-clean
+  tab drops its tint instead of keeping a stale one.
 - `make-app.sh` must copy **every** SwiftPM resource bundle from the products
   directory into `Contents/Resources` — the library's own and one per
   dependency (`Highlighter_Highlighter` for the syntax highlighter). A

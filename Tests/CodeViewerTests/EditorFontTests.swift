@@ -22,6 +22,55 @@ struct EditorFontTests {
         )
     }
 
+    /// The row height the pinned paragraph style actually produces — the value
+    /// the line-number ruler and the change markers must place themselves with.
+    @MainActor
+    private func laidOutHeight(_ font: EditorFont) -> CGFloat {
+        let storage = NSTextStorage(
+            string: "Ag\nAg\n",
+            attributes: [
+                .font: font.nsFont,
+                .paragraphStyle: CodeTextFactory.paragraphStyle(font),
+            ]
+        )
+        let layoutManager = NSLayoutManager()
+        let container = NSTextContainer(size: NSSize(width: 1_000, height: 1_000))
+        container.lineFragmentPadding = 0
+        layoutManager.addTextContainer(container)
+        storage.addLayoutManager(layoutManager)
+        layoutManager.ensureLayout(for: container)
+        return layoutManager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil).height
+    }
+
+    @Test("the line height is the height TextKit lays out, fractional leading included")
+    @MainActor
+    func lineHeightIsTheLaidOutHeight() {
+        let fonts = [
+            EditorFont.default,
+            EditorFont(fontName: "Monaco", size: 12),
+            EditorFont(fontName: "Monaco", size: 14),
+            EditorFont(fontName: "Menlo", size: 15),
+        ]
+        for font in fonts {
+            #expect(
+                abs(font.lineHeight - laidOutHeight(font)) < 0.001,
+                "\(font.id): ruler \(font.lineHeight) vs layout \(laidOutHeight(font))"
+            )
+            #expect(font.pinnedLineHeight == (EditorFont.lineHeight(for: font.nsFont) + 2).rounded())
+        }
+    }
+
+    @Test("Monaco's fractional leading lands on the laid-out height, not the metric")
+    @MainActor
+    func monacoCorrectsFractionalLeading() {
+        let font = EditorFont(fontName: "Monaco", size: 12)
+        let metric = (EditorFont.lineHeight(for: font.nsFont) + 2).rounded()
+
+        // Without the correction the ruler would sit a point high per line.
+        #expect(font.lineHeight > metric)
+        #expect(abs(font.lineHeight - laidOutHeight(font)) < 0.001)
+    }
+
     @Test("sizes clamp into the offered range; empty names mean the system font")
     func clampingAndEmptyName() {
         #expect(EditorFont(fontName: nil, size: 42).size == EditorFont.sizeRange.upperBound)

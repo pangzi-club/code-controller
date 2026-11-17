@@ -295,12 +295,19 @@ private struct WorkspaceDetailView: View {
             text: textSelection?.text,
             documentID: textSelection?.documentID,
             language: textSelection?.language,
+            lineChanges: textSelection?.lineChanges ?? .empty,
             theme: settings.resolvedHighlightTheme(for: colorScheme),
             font: settings.editorFont
         )
     }
 
-    private var textSelection: (tabID: String, text: String, documentID: String, language: String?)? {
+    private var textSelection: (
+        tabID: String,
+        text: String,
+        documentID: String,
+        language: String?,
+        lineChanges: LineChangeMap?
+    )? {
         guard let tab = session.selectedTab,
               case .file(let url, let store) = tab.content,
               case .text(let document) = store.state,
@@ -311,7 +318,8 @@ private struct WorkspaceDetailView: View {
             tab.id,
             document.text,
             store.versionID,
-            SyntaxLanguageMapper.highlightLanguage(forExtension: url.pathExtension)
+            SyntaxLanguageMapper.highlightLanguage(forExtension: url.pathExtension),
+            session.git.lineChanges(for: url)
         )
     }
 
