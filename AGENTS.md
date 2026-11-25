@@ -4,9 +4,12 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-A SwiftUI macOS desktop app template built with SwiftPM only — there is no
-`.xcodeproj`. Targets macOS 14+ with Swift tools 5.9. The demo app is a small
-file browser; replace its domain code when forking the template.
+CodeCtrl, a native macOS code viewer — workspaces, a file tree, document
+tabs with syntax highlighting, git status badges, changed-line tints and
+inline commit diffs — built with SwiftUI and SwiftPM only; there is no
+`.xcodeproj`. Files open read-only. Targets macOS 14+ with Swift tools 5.9.
+The repository started from a SwiftUI + SwiftPM starter and keeps its
+tooling (`Scripts/rename.sh`, `TEMPLATE.md`).
 
 The package has two targets: a **library** (`CodeViewer`, all the views,
 models, stores and helpers) and a thin **executable** (`CodeViewerApp`, just
