@@ -32,6 +32,68 @@ struct QuickOpenMatch {
     let nameRange: Range<String.Index>?
 }
 
+/// One row of the panel's list: a workspace file or a palette command.
+enum QuickOpenResult: Identifiable {
+    case file(QuickOpenMatch)
+    case command(PaletteCommandMatch)
+
+    var id: String {
+        switch self {
+        case .file(let match): "file:" + match.entry.id
+        case .command(let match): "command:" + match.command.rawValue
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .file(let match): match.entry.name
+        case .command(let match): match.command.title
+        }
+    }
+
+    /// Character offsets of `title` to emphasize: the hit substring for a
+    /// file, each matched character for a fuzzy command match.
+    var highlightOffsets: [Range<Int>] {
+        switch self {
+        case .file(let match):
+            guard let range = match.nameRange else { return [] }
+            let name = match.entry.name
+            return [
+                name.distance(from: name.startIndex, to: range.lowerBound)
+                    ..< name.distance(from: name.startIndex, to: range.upperBound),
+            ]
+        case .command(let match):
+            return match.titleRanges
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .file(let match): FileIcon.symbolName(for: match.entry.url, isDirectory: false)
+        case .command(let match): match.command.symbolName
+        }
+    }
+
+    /// Trailing secondary text: the directory for a file, the category for a
+    /// command.
+    var detail: String? {
+        switch self {
+        case .file(let match):
+            match.entry.directoryPath.isEmpty ? nil : match.entry.directoryPath
+        case .command(let match):
+            l10nString(match.command.category.labelKey)
+        }
+    }
+
+    /// Tooltip. A command row already shows all it has.
+    var help: String? {
+        switch self {
+        case .file(let match): match.entry.relativePath
+        case .command: nil
+        }
+    }
+}
+
 /// Pure file-name/path matching for the quick-open panel, free of SwiftUI so
 /// it can be unit tested.
 enum QuickOpenMatcher {
@@ -108,15 +170,22 @@ final class QuickOpenIndex {
 }
 
 /// Floating ⌘P panel: a search field on top and matching workspace files
-/// below, over a light scrim. Dismisses on Esc, on a click outside the panel,
-/// and after opening a file.
+/// below, over a light scrim. A leading `>` in the query swaps the files for
+/// the command palette. Dismisses on Esc, on a click outside the panel, and
+/// after opening a file or running a command.
 struct QuickOpenView: View {
     let root: URL
+    /// The commands offered after a `>`: whatever can act on the current
+    /// state, in palette order.
+    let commands: [PaletteCommand]
+    /// Owned by the presenter, so ⌘⇧P can switch an open panel to command
+    /// mode while keeping the same view identity.
+    @Binding var query: String
     let onOpen: (URL) -> Void
+    let onCommand: (PaletteCommand) -> Void
     let onDismiss: () -> Void
 
     @State private var index = QuickOpenIndex()
-    @State private var query = ""
     @State private var selectedIndex = 0
 
     var body: some View {
@@ -131,24 +200,37 @@ struct QuickOpenView: View {
         .task(id: root) { await index.load(root: root) }
     }
 
-    private var matches: [QuickOpenMatch] {
-        QuickOpenMatcher.filter(index.entries, query: query)
+    private var isCommandMode: Bool {
+        if case .commands = QuickOpenQuery(query) { return true }
+        return false
+    }
+
+    /// Files or commands for the current query; the list, the selection and
+    /// Enter all work on this one sequence.
+    private var results: [QuickOpenResult] {
+        switch QuickOpenQuery(query) {
+        case .files(let text):
+            return QuickOpenMatcher.filter(index.entries, query: text).map { .file($0) }
+        case .commands(let text):
+            return PaletteCommandMatcher.filter(commands, query: text).map { .command($0) }
+        }
     }
 
     private var panel: some View {
         VStack(spacing: 0) {
             QuickOpenSearchField(
                 query: $query,
+                placeholder: l10nString("Search files… (type > to run commands)"),
                 onSelectPrevious: moveSelectionUp,
                 onSelectNext: moveSelectionDown,
-                onConfirm: openSelection,
+                onConfirm: activateSelection,
                 onCancel: onDismiss
             )
             .padding(10)
 
             Divider()
 
-            results
+            resultsList
         }
         .frame(width: 600)
         .background(
@@ -166,15 +248,21 @@ struct QuickOpenView: View {
     }
 
     @ViewBuilder
-    private var results: some View {
-        if index.isScanning && index.entries.isEmpty {
+    private var resultsList: some View {
+        if isCommandMode {
+            if results.isEmpty {
+                emptyState(icon: "terminal", message: "No matching commands")
+            } else {
+                list
+            }
+        } else if index.isScanning && index.entries.isEmpty {
             ProgressView()
                 .controlSize(.small)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 28)
         } else if index.entries.isEmpty {
             emptyState(icon: "folder", message: "This workspace is empty")
-        } else if matches.isEmpty {
+        } else if results.isEmpty {
             emptyState(icon: "magnifyingglass", message: "No matching files")
         } else {
             list
@@ -195,21 +283,25 @@ struct QuickOpenView: View {
     }
 
     private var list: some View {
-        let currentMatches = matches
+        let currentResults = results
+        // The list can shrink under the selection (a watcher event closes a
+        // tab while the panel is open); the highlighted row is the one Enter
+        // activates.
+        let selection = min(selectedIndex, max(currentResults.count - 1, 0))
         // Rows are fixed (24pt + 1pt spacing) inside 4pt container padding, so
         // the scroll view is sized to hug the results exactly until they pass
         // the 380pt cap. A taller scroll view centers its content and leaves a
         // dead band above the first row; fixedSize on a ScrollView does not
         // reliably hug, so the height comes from the row math instead.
-        let listHeight = min(CGFloat(currentMatches.count) * 25 + 7, 380)
+        let listHeight = min(CGFloat(currentResults.count) * 25 + 7, 380)
         return ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 1) {
-                    ForEach(Array(currentMatches.enumerated()), id: \.element.entry.id) { offset, match in
+                    ForEach(Array(currentResults.enumerated()), id: \.element.id) { offset, result in
                         QuickOpenRowView(
-                            match: match,
-                            isSelected: offset == selectedIndex,
-                            onActivate: { open(match.entry.url) }
+                            result: result,
+                            isSelected: offset == selection,
+                            onActivate: { activate(result) }
                         )
                         .id(offset)
                     }
@@ -229,22 +321,25 @@ struct QuickOpenView: View {
     }
 
     private func moveSelectionDown() {
-        selectedIndex = min(selectedIndex + 1, max(matches.count - 1, 0))
+        selectedIndex = min(selectedIndex + 1, max(results.count - 1, 0))
     }
 
-    private func openSelection() {
-        let currentMatches = matches
-        guard currentMatches.indices.contains(selectedIndex) else { return }
-        open(currentMatches[selectedIndex].entry.url)
+    private func activateSelection() {
+        let currentResults = results
+        guard currentResults.indices.contains(selectedIndex) else { return }
+        activate(currentResults[selectedIndex])
     }
 
-    private func open(_ url: URL) {
-        onOpen(url)
+    private func activate(_ result: QuickOpenResult) {
+        switch result {
+        case .file(let match): onOpen(match.entry.url)
+        case .command(let match): onCommand(match.command)
+        }
     }
 }
 
 private struct QuickOpenRowView: View {
-    let match: QuickOpenMatch
+    let result: QuickOpenResult
     let isSelected: Bool
     let onActivate: () -> Void
 
@@ -253,20 +348,20 @@ private struct QuickOpenRowView: View {
     var body: some View {
         Button(action: onActivate) {
             HStack(spacing: 6) {
-                Image(systemName: FileIcon.symbolName(for: match.entry.url, isDirectory: false))
+                Image(systemName: result.symbolName)
                     .font(.system(size: 11))
                     .foregroundStyle(isSelected ? Color.white : Color.secondary)
                     .frame(width: 16)
 
-                highlightedName
+                highlightedTitle
                     .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(isSelected ? Color.white : Color.primary)
                     .lineLimit(1)
 
                 Spacer(minLength: 12)
 
-                if !match.entry.directoryPath.isEmpty {
-                    Text(match.entry.directoryPath)
+                if let detail = result.detail {
+                    Text(detail)
                         .font(.system(size: 11))
                         .foregroundStyle(isSelected ? Color.white.opacity(0.75) : Color.secondary)
                         .lineLimit(1)
@@ -283,7 +378,7 @@ private struct QuickOpenRowView: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
-        .help(match.entry.relativePath)
+        .tooltip(result.help)
     }
 
     private var rowBackground: Color {
@@ -292,15 +387,38 @@ private struct QuickOpenRowView: View {
         return .clear
     }
 
-    /// The file name with the matched query substring emphasized, VS Code
-    /// style. Path-fallback matches and the empty query render plain.
-    private var highlightedName: Text {
-        guard let range = match.nameRange else { return Text(match.entry.name) }
-        let name = match.entry.name
+    /// The title with the matched characters emphasized, VS Code style.
+    /// Path-fallback file matches, keyword-only command matches and the
+    /// empty query render plain.
+    private var highlightedTitle: Text {
+        let title = result.title
+        let ranges = result.highlightOffsets.map { offset in
+            title.index(title.startIndex, offsetBy: offset.lowerBound)
+                ..< title.index(title.startIndex, offsetBy: offset.upperBound)
+        }
+        guard !ranges.isEmpty else { return Text(title) }
         let matchColor: Color = isSelected ? .white : .accentColor
-        return Text(String(name[name.startIndex..<range.lowerBound]))
-            + Text(String(name[range])).bold().foregroundStyle(matchColor)
-            + Text(String(name[range.upperBound...]))
+        var combined = Text("")
+        var cursor = title.startIndex
+        for range in ranges {
+            combined = combined
+                + Text(String(title[cursor..<range.lowerBound]))
+                + Text(String(title[range])).bold().foregroundStyle(matchColor)
+            cursor = range.upperBound
+        }
+        return combined + Text(String(title[cursor...]))
+    }
+}
+
+private extension View {
+    /// `.help` for an optional text: nothing when nil.
+    @ViewBuilder
+    func tooltip(_ text: String?) -> some View {
+        if let text {
+            help(text)
+        } else {
+            self
+        }
     }
 }
 
@@ -310,6 +428,7 @@ private struct QuickOpenRowView: View {
 /// editor's `doCommandBy` hook.
 private struct QuickOpenSearchField: NSViewRepresentable {
     @Binding var query: String
+    let placeholder: String
     let onSelectPrevious: () -> Void
     let onSelectNext: () -> Void
     let onConfirm: () -> Void
@@ -321,13 +440,20 @@ private struct QuickOpenSearchField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSSearchField {
         let field = FocusableSearchField()
-        field.placeholderString = l10nString("Search files…")
+        field.placeholderString = placeholder
         field.delegate = context.coordinator
         return field
     }
 
     func updateNSView(_ field: NSSearchField, context: Context) {
         context.coordinator.parent = self
+        field.placeholderString = placeholder
+        // The presenter may replace the query while the panel is open (⌘⇧P
+        // switches it to command mode). Typed text already matches and is
+        // left alone, so marked-text input is never interrupted.
+        guard field.stringValue != query else { return }
+        field.stringValue = query
+        field.currentEditor()?.moveToEndOfParagraph(nil)
     }
 
     final class Coordinator: NSObject, NSSearchFieldDelegate {
@@ -380,6 +506,9 @@ private struct QuickOpenSearchField: NSViewRepresentable {
             DispatchQueue.main.async { [weak self] in
                 guard let self, let window else { return }
                 window.makeFirstResponder(self)
+                // ⌘⇧P seeds the field with ">"; a select-all on focus would
+                // let the first keystroke replace it and drop back to files.
+                self.currentEditor()?.moveToEndOfParagraph(nil)
             }
         }
     }
@@ -389,7 +518,10 @@ private struct QuickOpenSearchField: NSViewRepresentable {
 #Preview {
     QuickOpenView(
         root: PreviewFixtures.sampleWorkspace,
+        commands: PaletteCommand.allCases,
+        query: .constant(">"),
         onOpen: { _ in },
+        onCommand: { _ in },
         onDismiss: {}
     )
     .frame(width: 800, height: 500)

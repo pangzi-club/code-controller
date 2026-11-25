@@ -142,6 +142,25 @@ final class WorkspaceSession {
         }
     }
 
+    /// Closes every tab at once (the palette's Close All Tabs).
+    func closeAllTabs() {
+        guard !tabs.isEmpty else { return }
+        let hadFileTabs = tabs.contains { $0.url != nil }
+        tabs.removeAll()
+        selectedTabID = nil
+        if hadFileTabs {
+            Task { await refreshLineChanges() }
+        }
+    }
+
+    /// Moves the selection by `offset`, wrapping around the ends (the
+    /// palette's Select Next/Previous Tab).
+    func selectTab(atOffset offset: Int) {
+        guard let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else { return }
+        let wrapped = ((index + offset) % tabs.count + tabs.count) % tabs.count
+        selectedTabID = tabs[wrapped].id
+    }
+
     // MARK: Bulk closes (tab strip context menu)
 
     /// Closes every tab except `anchor`, which becomes the selection.

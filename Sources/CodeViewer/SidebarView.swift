@@ -1,15 +1,18 @@
 import SwiftUI
 
+/// The sidebar's two panes: the file tree or the commit graph. Owned by the
+/// main window so both the segmented picker and the palette can drive it.
+enum SidebarPane: Hashable {
+    case files
+    case graph
+}
+
 /// Sidebar: a workspace menu followed by the selected workspace's file tree
 /// or commit history.
 struct SidebarView: View {
-    private enum Pane {
-        case files
-        case graph
-    }
-
     let store: WorkspaceStore
     @Binding var selection: Workspace.ID?
+    @Binding var pane: SidebarPane
     let session: WorkspaceSession?
     let topPadding: CGFloat
     let onSelect: (Workspace) -> Void
@@ -17,7 +20,6 @@ struct SidebarView: View {
     let onRemove: (Workspace) -> Void
     let onDropURL: (URL) -> Void
 
-    @State private var pane: Pane = .files
     @State private var dropTargeted = false
 
     private var selectedWorkspace: Workspace? {
@@ -127,8 +129,8 @@ struct SidebarView: View {
 
     private var panePicker: some View {
         Picker("", selection: $pane) {
-            Text(l10nString("Files")).tag(Pane.files)
-            Text(l10nString("Graph")).tag(Pane.graph)
+            Text(l10nString("Files")).tag(SidebarPane.files)
+            Text(l10nString("Graph")).tag(SidebarPane.graph)
         }
         .pickerStyle(.segmented)
         .controlSize(.small)

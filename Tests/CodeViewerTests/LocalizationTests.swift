@@ -42,6 +42,8 @@ struct LocalizationTests {
                 + LanguagePreference.allCases.map(\.labelKey)
                 + EditorTheme.allCases.map(\.labelKey)
                 + SettingsPane.allCases.map(\.labelKey)
+                + PaletteCommand.allCases.map(\.titleKey)
+                + PaletteCommand.Category.allCases.map(\.labelKey)
         )
 
         for key in keys {

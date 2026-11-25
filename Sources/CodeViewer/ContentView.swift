@@ -7,6 +7,7 @@ public struct ContentView: View {
     @State private var selectedWorkspaceID: Workspace.ID?
     @State private var session: WorkspaceSession?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var sidebarPane: SidebarPane = .files
     @State private var chromeStripHeight: CGFloat = 28
     @State private var isFullScreen = false
     @State private var isChoosingWorkspace = false
@@ -19,6 +20,7 @@ public struct ContentView: View {
             SidebarView(
                 store: workspaces,
                 selection: $selectedWorkspaceID,
+                pane: $sidebarPane,
                 session: session,
                 topPadding: isFullScreen ? 8 : max(chromeStripHeight, 28) + 8,
                 onSelect: select,
@@ -77,7 +79,8 @@ public struct ContentView: View {
             WorkspaceDetailView(
                 workspace: workspace,
                 session: session,
-                sidebarLeadingInset: columnVisibility == .detailOnly ? 78 : 0
+                sidebarLeadingInset: columnVisibility == .detailOnly ? 78 : 0,
+                onSelectSidebarPane: selectSidebarPane
             )
         } else {
             PlaceholderView(addWorkspace: presentWorkspacePicker)
@@ -125,6 +128,16 @@ public struct ContentView: View {
     private func toggleSidebar() {
         withAnimation {
             columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        }
+    }
+
+    /// A palette "Show …" command implies the sidebar: reveal it if collapsed.
+    private func selectSidebarPane(_ pane: SidebarPane) {
+        withAnimation {
+            sidebarPane = pane
+            if columnVisibility == .detailOnly {
+                columnVisibility = .all
+            }
         }
     }
 
@@ -183,14 +196,18 @@ public struct ContentView: View {
 
 private struct WorkspaceDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openSettings) private var openSettings
     @EnvironmentObject private var settings: SettingsStore
     let workspace: Workspace
     let session: WorkspaceSession
     /// Room for the traffic lights when the sidebar is collapsed and the
     /// content starts at the window's leading edge.
     let sidebarLeadingInset: CGFloat
+    /// Switches the sidebar's Files/Graph pane for the palette's Show commands.
+    let onSelectSidebarPane: (SidebarPane) -> Void
 
     @State private var isQuickOpenPresented = false
+    @State private var quickOpenQuery = ""
 
     private var title: String {
         session.selectedTab?.name ?? workspace.name
@@ -208,9 +225,15 @@ private struct WorkspaceDetailView: View {
                 if isQuickOpenPresented {
                     QuickOpenView(
                         root: workspace.url,
+                        commands: availablePaletteCommands,
+                        query: $quickOpenQuery,
                         onOpen: { url in
                             dismissQuickOpen()
                             session.open(FileNode(url: url, isDirectory: false))
+                        },
+                        onCommand: { command in
+                            dismissQuickOpen()
+                            run(command)
                         },
                         onDismiss: dismissQuickOpen
                     )
@@ -234,11 +257,10 @@ private struct WorkspaceDetailView: View {
             session.select(session.tabs[index])
         }
         .onReceive(NotificationCenter.default.publisher(for: .quickOpen)) { _ in
-            if isQuickOpenPresented {
-                dismissQuickOpen()
-            } else {
-                isQuickOpenPresented = true
-            }
+            presentQuickOpen(commands: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .commandPalette)) { _ in
+            presentQuickOpen(commands: true)
         }
         // The panel indexes the workspace it opened on; a different selection
         // starts from a clean slate instead of searching the old root.
@@ -247,12 +269,73 @@ private struct WorkspaceDetailView: View {
         }
     }
 
+    /// ⌘P toggles the panel; ⌘⇧P opens it in — or switches an open one to —
+    /// command mode, by seeding the query with the `>` prefix.
+    private func presentQuickOpen(commands: Bool) {
+        if isQuickOpenPresented {
+            if commands {
+                quickOpenQuery = ">"
+            } else {
+                dismissQuickOpen()
+            }
+            return
+        }
+        quickOpenQuery = commands ? ">" : ""
+        isQuickOpenPresented = true
+    }
+
     /// Resigns the search field before the panel unmounts, so the field editor
     /// never dangles on a view that is leaving the hierarchy.
     private func dismissQuickOpen() {
         guard isQuickOpenPresented else { return }
         NSApp.keyWindow?.makeFirstResponder(nil)
         isQuickOpenPresented = false
+    }
+
+    /// The palette's catalog minus whatever cannot act on the current state.
+    private var availablePaletteCommands: [PaletteCommand] {
+        PaletteCommand.allCases.filter {
+            $0.isAvailable(tabs: session.tabs, selectedTabID: session.selectedTabID)
+        }
+    }
+
+    /// Runs a palette command; the panel is already dismissed by the caller.
+    private func run(_ command: PaletteCommand) {
+        let selectedTab = session.selectedTab
+        switch command {
+        case .closeTab:
+            if let selectedTab { session.close(selectedTab) }
+        case .closeOtherTabs:
+            if let selectedTab { session.closeOthers(keeping: selectedTab) }
+        case .closeTabsToLeft:
+            if let selectedTab { session.closeTabsToLeft(of: selectedTab) }
+        case .closeTabsToRight:
+            if let selectedTab { session.closeTabsToRight(of: selectedTab) }
+        case .closeAllTabs:
+            session.closeAllTabs()
+        case .selectNextTab:
+            session.selectTab(atOffset: 1)
+        case .selectPreviousTab:
+            session.selectTab(atOffset: -1)
+        case .showFiles:
+            onSelectSidebarPane(.files)
+        case .showGitGraph:
+            onSelectSidebarPane(.graph)
+        case .toggleSidebar:
+            NotificationCenter.default.post(name: .toggleSidebar, object: nil)
+        case .refreshWorkspace:
+            NotificationCenter.default.post(name: .refreshWorkspace, object: nil)
+        case .revealActiveFileInFinder:
+            if let url = selectedTab?.url { FileOpener.reveal(url) }
+        case .openSettings:
+            openSettings()
+        case .toggleAppearance:
+            // Flips the appearance in effect, so a "system" preference that
+            // currently renders dark goes to light.
+            let effective = settings.theme.colorScheme ?? colorScheme
+            settings.theme = effective == .dark ? .light : .dark
+        }
+        Log.app.notice("Run palette command \(command.rawValue)")
     }
 
     /// The window has no toolbar: tabs and actions live in one strip at the

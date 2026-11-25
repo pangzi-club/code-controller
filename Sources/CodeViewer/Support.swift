@@ -41,6 +41,10 @@ public extension Notification.Name {
     /// Posted by the View menu's Go to File command; the workspace detail view
     /// toggles the quick-open panel.
     static let quickOpen = Notification.Name("\(AppInfo.bundleID).quickOpen")
+
+    /// Posted by the View menu's Command Palette command (⌘⇧P); the panel
+    /// opens in — or switches to — command mode.
+    static let commandPalette = Notification.Name("\(AppInfo.bundleID).commandPalette")
 }
 
 /// Weak holder for the app's main window, filled in by WindowChrome's

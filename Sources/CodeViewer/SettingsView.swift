@@ -259,6 +259,8 @@ private struct EditorPane: View {
 private struct ShortcutsPane: View {
     private static let rows: [(keys: String, actionKey: String)] = [
         ("⌘P", "Go to File…"),
+        ("⌘P >", "Run a Command…"),
+        ("⌘⇧P", "Command Palette…"),
         ("⌘W", "Close Tab"),
         ("⌘1…⌘9", "Select Tab"),
         ("⌃⌘S", "Toggle Sidebar"),

@@ -72,5 +72,21 @@
 
 // Quick open
 "Go to File…" = "Go to File…";
-"Search files…" = "Search files…";
+"Search files… (type > to run commands)" = "Search files… (type > to run commands)";
 "No matching files" = "No matching files";
+
+// Command palette (⌘P then >)
+"Command Palette…" = "Command Palette…";
+"Run a Command…" = "Run a Command…";
+"No matching commands" = "No matching commands";
+"Close All Tabs" = "Close All Tabs";
+"Select Next Tab" = "Select Next Tab";
+"Select Previous Tab" = "Select Previous Tab";
+"Show Files" = "Show Files";
+"Show Git Graph" = "Show Git Graph";
+"Reveal Active File in Finder" = "Reveal Active File in Finder";
+"Toggle Light/Dark Appearance" = "Toggle Light/Dark Appearance";
+"View" = "View";
+"Tabs" = "Tabs";
+"File" = "File";
+"Preferences" = "Preferences";

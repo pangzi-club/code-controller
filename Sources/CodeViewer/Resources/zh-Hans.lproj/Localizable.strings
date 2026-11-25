@@ -72,5 +72,21 @@
 
 // Quick open
 "Go to File…" = "转到文件…";
-"Search files…" = "搜索文件…";
+"Search files… (type > to run commands)" = "搜索文件…（输入 > 执行命令）";
 "No matching files" = "没有匹配的文件";
+
+// 命令面板（⌘P 后输入 >）
+"Command Palette…" = "命令面板…";
+"Run a Command…" = "执行命令…";
+"No matching commands" = "没有匹配的命令";
+"Close All Tabs" = "关闭所有标签页";
+"Select Next Tab" = "切换到下一个标签页";
+"Select Previous Tab" = "切换到上一个标签页";
+"Show Files" = "显示文件";
+"Show Git Graph" = "显示 Git 提交图";
+"Reveal Active File in Finder" = "在 Finder 中显示当前文件";
+"Toggle Light/Dark Appearance" = "切换浅色 / 深色外观";
+"View" = "视图";
+"Tabs" = "标签页";
+"File" = "文件";
+"Preferences" = "偏好设置";

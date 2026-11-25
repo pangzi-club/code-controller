@@ -27,7 +27,7 @@ CodeCtrl is at version 0.1 and under active development.
 
 - **Workspaces sidebar**: add folders from the workspace menu or by dragging them in; each gets a stable color tile derived from its path. The sidebar hosts a Files/Graph pane switch, uses the native translucent material, and extends under the transparent titlebar to the traffic lights.
 - **File tree**: lazily loaded recursive tree (directories first, then by name) with hover highlighting, context menus (Open, Show in Finder) and per-row git status badges.
-- **Quick open (⌘P)**: a floating search panel over the workspace. It rescans on every open, matches file names case-insensitively (falling back to relative-path matches), highlights the hit in the name, and navigates with ↑/↓ + Enter; Esc or a click outside dismisses it.
+- **Quick open (⌘P)**: a floating search panel over the workspace. It rescans on every open, matches file names case-insensitively (falling back to relative-path matches), highlights the hit in the name, and navigates with ↑/↓ + Enter; Esc or a click outside dismisses it. A leading `>` (or ⌘⇧P) turns the same panel into a VS Code-style command palette: close the tab / other tabs / tabs to the left or right / all tabs, select the next or previous tab, show the Files or Git Graph pane, toggle the sidebar, refresh, reveal the active file in Finder, open Settings, toggle light/dark appearance. Commands match fuzzily on their title and keywords, and ones with nothing to act on are left out.
 - **Document tabs**: one tab per file with middle-truncating titles, two-row wrapping, a close button and the same git status badge; the context menu closes the other tabs or everything to the left/right. ⌘W closes the selected tab (does nothing with no tabs open, so it never takes the window down); ⌘1…⌘9 switch tabs. Views are pooled in an LRU (8 entries) so switching tabs preserves scroll position and selection. Image files (PNG, JPEG, GIF, WebP, HEIC, HEIF, TIFF, BMP, AVIF, SVG) open as scaled-to-fit previews — animated formats play, oversized files still hit the shared size limit, and corrupted ones fall back to the binary-file notice. A commit's merged diff opens as its own tab kind with a git-flavored icon.
 - **Syntax highlighting**: a built-in Swift scanner — no JavaScript engine — covering 60+ file types (keywords, types, calls, strings, numbers, comments, plus dedicated passes for Markdown, JSON, YAML, TOML/INI, XML/HTML, CSS and diffs), running on a background task behind a `SyntaxHighlighter` protocol seam. Finished results cache per document version, theme and editor font (LRU, 12 entries); the styled output is re-pinned to the editor font and pinned line height so the line-number ruler never shifts; separate editor themes for light and dark appearance (13 built-in palettes matching the highlight.js themes of the same names, each rendered on its own background).
 - **Git integration**: repository detection at the workspace root with graceful degradation when git is missing; `git status` badges (M/A/D/?) on tree rows and tabs (⌘R refreshes tree, statuses, commits and the selected document). Only read-only git commands are used (`status`, `diff`, `log`, `show`).
@@ -45,6 +45,8 @@ CodeCtrl is at version 0.1 and under active development.
 | Keys | Action |
 | --- | --- |
 | `⌘P` | Go to File… (quick open) |
+| `⌘P` then `>` | Run a command from the quick-open panel (command palette) |
+| `⌘⇧P` | Open the command palette directly |
 | `⌘W` | Close the selected tab |
 | `⌘1`…`⌘9` | Select the first to ninth tab |
 | `⌃⌘S` | Toggle the sidebar |
@@ -236,7 +238,8 @@ Sources/
 │   ├── FileService.swift         # Actor: directory listings, file reads, image decoding
 │   ├── FileTree.swift            # Lazily loaded tree store
 │   ├── FileTreeView.swift        # Tree rows with git badges
-│   ├── QuickOpen.swift           # ⌘P quick-open panel: recursive scan, matching, overlay UI
+│   ├── QuickOpen.swift           # ⌘P quick-open panel: file and command rows, overlay UI
+│   ├── CommandPalette.swift     # ⌘P `>` commands: catalog, availability rules, fuzzy matcher
 │   ├── DocumentTab.swift         # Tab model (file or commit diff, per-tab document)
 │   ├── DocumentTabBar.swift      # Wrapping tab strip with badges
 │   ├── DocumentStore.swift       # Per-tab file document: load state, reload-if-changed

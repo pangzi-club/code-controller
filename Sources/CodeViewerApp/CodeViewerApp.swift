@@ -48,6 +48,11 @@ struct CodeViewerApp: App {
                     NotificationCenter.default.post(name: .quickOpen, object: nil)
                 }
                 .keyboardShortcut("p", modifiers: .command)
+
+                Button(l10nString("Command Palette…")) {
+                    NotificationCenter.default.post(name: .commandPalette, object: nil)
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
             }
         }
 

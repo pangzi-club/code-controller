@@ -328,4 +328,45 @@ struct WorkspaceSessionTests {
         #expect(session.tabs.count == 1)
         #expect(session.selectedTab?.id == "file:" + file.url.path)
     }
+
+    @Test("close-all clears the strip and the selection, and is a no-op when empty")
+    func closesAllTabs() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+
+        session.closeAllTabs()
+        #expect(session.selectedTab == nil)
+
+        session.open(try makeNode("A.swift", in: root))
+        session.open(try makeNode("B.swift", in: root))
+        session.select(session.tabs[0])
+
+        session.closeAllTabs()
+
+        #expect(session.tabs.isEmpty)
+        #expect(session.selectedTab == nil)
+    }
+
+    @Test("selecting by offset moves the selection and wraps around both ends")
+    func selectsTabByOffset() throws {
+        let root = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = WorkspaceSession(workspace: Workspace(url: root))
+
+        session.selectTab(atOffset: 1)
+        #expect(session.selectedTab == nil)
+
+        session.open(try makeNode("A.swift", in: root))
+        session.open(try makeNode("B.swift", in: root))
+        session.open(try makeNode("C.swift", in: root))
+        let urls = session.tabs.compactMap(\.url)
+
+        session.selectTab(atOffset: 1)
+        #expect(session.selectedTab?.url == urls[0])
+        session.selectTab(atOffset: -1)
+        #expect(session.selectedTab?.url == urls[2])
+        session.selectTab(atOffset: -1)
+        #expect(session.selectedTab?.url == urls[1])
+    }
 }
