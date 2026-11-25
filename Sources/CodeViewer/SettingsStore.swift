@@ -25,46 +25,6 @@ public enum ThemePreference: String, CaseIterable {
     }
 }
 
-/// User-selectable code-highlighting theme. Raw values must match a `.css`
-/// file bundled with HighlighterSwift. The editor keeps one theme per
-/// interface appearance (`SettingsStore.lightTheme` / `darkTheme`), so the
-/// defaults below reproduce the stock appearance-following pair.
-public enum EditorThemeOption: String, CaseIterable {
-    case xcode
-    case xcodeDusk = "xcode-dusk"
-    case github
-    case githubDark = "github-dark"
-    case atomOneLight = "atom-one-light"
-    case atomOneDark = "atom-one-dark"
-    case dracula
-    case nord
-    case monokai
-    case solarizedLight = "solarized-light"
-    case solarizedDark = "solarized-dark"
-    case tokyoNight = "tokyo-night-dark"
-    case vsDark = "vs-dark"
-
-    /// Localization key for the picker item. Theme names are proper nouns and
-    /// keep their spelling in both catalogs.
-    var labelKey: String {
-        switch self {
-        case .xcode: "Xcode"
-        case .xcodeDusk: "Xcode Dusk"
-        case .github: "GitHub"
-        case .githubDark: "GitHub Dark"
-        case .atomOneLight: "Atom One Light"
-        case .atomOneDark: "Atom One Dark"
-        case .dracula: "Dracula"
-        case .nord: "Nord"
-        case .monokai: "Monokai"
-        case .solarizedLight: "Solarized Light"
-        case .solarizedDark: "Solarized Dark"
-        case .tokyoNight: "Tokyo Night"
-        case .vsDark: "VS Dark"
-        }
-    }
-}
-
 /// User-selectable interface language.
 enum LanguagePreference: String, CaseIterable {
     case system
@@ -94,12 +54,12 @@ public final class SettingsStore: ObservableObject {
     }
 
     /// The highlighting theme used while the interface is in light mode.
-    @Published public var lightTheme: EditorThemeOption {
+    @Published public var lightTheme: EditorTheme {
         didSet { UserDefaults.standard.set(lightTheme.rawValue, forKey: Self.lightThemeKey) }
     }
 
     /// The highlighting theme used while the interface is in dark mode.
-    @Published public var darkTheme: EditorThemeOption {
+    @Published public var darkTheme: EditorTheme {
         didSet { UserDefaults.standard.set(darkTheme.rawValue, forKey: Self.darkThemeKey) }
     }
 
@@ -131,8 +91,8 @@ public final class SettingsStore: ObservableObject {
 
     /// The highlighting theme for the interface appearance currently in
     /// effect. Themes always render on their own background color.
-    func resolvedHighlightTheme(for colorScheme: ColorScheme) -> HighlightTheme {
-        HighlightTheme(name: colorScheme == .dark ? darkTheme.rawValue : lightTheme.rawValue)
+    func resolvedHighlightTheme(for colorScheme: ColorScheme) -> EditorTheme {
+        colorScheme == .dark ? darkTheme : lightTheme
     }
 
     public init() {
@@ -142,12 +102,12 @@ public final class SettingsStore: ObservableObject {
         // seeds both slots; each slot defaults to the stock appearance
         // pair (Xcode in light, Xcode Dusk in dark).
         let legacyTheme = UserDefaults.standard.string(forKey: Self.legacyThemeKey)
-            .flatMap(EditorThemeOption.init(rawValue:))
+            .flatMap(EditorTheme.init(rawValue:))
         lightTheme = UserDefaults.standard.string(forKey: Self.lightThemeKey)
-            .flatMap(EditorThemeOption.init(rawValue:))
+            .flatMap(EditorTheme.init(rawValue:))
             ?? legacyTheme ?? .xcode
         darkTheme = UserDefaults.standard.string(forKey: Self.darkThemeKey)
-            .flatMap(EditorThemeOption.init(rawValue:))
+            .flatMap(EditorTheme.init(rawValue:))
             ?? legacyTheme ?? .xcodeDusk
         editorFontName = UserDefaults.standard.string(forKey: Self.editorFontNameKey) ?? ""
         // A missing size is 13; a stored one clamps into the offered range so

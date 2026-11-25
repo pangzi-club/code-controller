@@ -13,13 +13,13 @@ struct CodePane: NSViewRepresentable {
     let tabID: String?
     let text: String?
     let documentID: String?
-    /// Canonical highlight.js language for the file extension, or nil to
-    /// render plain text.
+    /// Canonical language name for the file extension, or nil to render
+    /// plain text.
     let language: String?
     /// Working-tree change marks for this file; the editor tints the changed
     /// lines the way the commit diff tints its rows.
     var lineChanges: LineChangeMap = .empty
-    let theme: HighlightTheme
+    let theme: EditorTheme
     var font: EditorFont = .default
 
     func makeCoordinator() -> Coordinator {
@@ -59,7 +59,7 @@ struct CodePane: NSViewRepresentable {
             var language: String?
             /// Theme and font the editor's current paint was made for; nil
             /// means the content is stale and needs (re)painting.
-            var appliedTheme: HighlightTheme?
+            var appliedTheme: EditorTheme?
             var appliedFont: EditorFont?
             var highlightTask: Task<Void, Never>?
         }
@@ -72,7 +72,7 @@ struct CodePane: NSViewRepresentable {
         private var entries: [String: Entry] = [:]
         private var savedStates: [String: SavedState] = [:]
         private var currentTabID: String?
-        private var currentTheme = HighlightTheme.light
+        private var currentTheme = EditorTheme.light
         private var currentFont = EditorFont.default
         private var clock = 0
         private let cache = HighlightCache()
@@ -84,7 +84,7 @@ struct CodePane: NSViewRepresentable {
             documentID: String?,
             language: String?,
             lineChanges: LineChangeMap,
-            theme: HighlightTheme,
+            theme: EditorTheme,
             font: EditorFont
         ) {
             guard let container, let tabID, let text, let documentID else { return }
@@ -160,7 +160,7 @@ struct CodePane: NSViewRepresentable {
         /// Paints one entry for `theme` and `font`: from the cache when
         /// possible, otherwise plain text first and a styled swap-in once the
         /// background highlight finishes.
-        private func applyContent(to tabID: String, theme: HighlightTheme, font: EditorFont) {
+        private func applyContent(to tabID: String, theme: EditorTheme, font: EditorFont) {
             guard var entry = entries[tabID] else { return }
             entry.highlightTask?.cancel()
             entry.highlightTask = nil
@@ -192,38 +192,27 @@ struct CodePane: NSViewRepresentable {
             let text = entry.text
             let task = Task { @MainActor [weak self, weak editorView] in
                 guard let self, let editorView else { return }
-                do {
-                    let raw = try await self.service.highlight(
-                        requestKey: cacheKey,
-                        text: text,
-                        language: language,
-                        theme: theme
-                    )
-                    let styled = CodeTextFactory.styled(raw.attributed, font: font)
-                    let background = raw.background
-                    guard !Task.isCancelled,
-                          let current = self.entries[tabID],
-                          current.editorView === editorView,
-                          current.documentID == documentID,
-                          current.appliedTheme == theme,
-                          current.appliedFont == font else { return }
-                    self.cache.store(
-                        HighlightCache.Entry(attributed: styled, background: background),
-                        for: cacheKey,
-                        theme: theme,
-                        fontID: font.id
-                    )
-                    editorView.setBackground(background)
-                    editorView.setAttributedText(styled)
-                } catch is CancellationError {
-                } catch HighlightError.unsupportedLanguage {
-                    // Unknown language: plain text is the graceful fallback,
-                    // already painted.
-                } catch {
-                    Log.editor.error(
-                        "Highlighting \(language) failed: \(error.localizedDescription)"
-                    )
-                }
+                let raw = await self.service.highlight(
+                    requestKey: cacheKey,
+                    text: text,
+                    language: language,
+                    theme: theme
+                )
+                let styled = CodeTextFactory.styled(raw.attributed, font: font)
+                guard !Task.isCancelled,
+                      let current = self.entries[tabID],
+                      current.editorView === editorView,
+                      current.documentID == documentID,
+                      current.appliedTheme == theme,
+                      current.appliedFont == font else { return }
+                self.cache.store(
+                    HighlightCache.Entry(attributed: styled, background: raw.background),
+                    for: cacheKey,
+                    theme: theme,
+                    fontID: font.id
+                )
+                editorView.setBackground(raw.background)
+                editorView.setAttributedText(styled)
             }
             entry.highlightTask = task
             entries[tabID] = entry

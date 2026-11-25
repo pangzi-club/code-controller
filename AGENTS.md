@@ -205,23 +205,30 @@ instead of a developer's home path.
   tab drops its tint instead of keeping a stale one.
 - `make-app.sh` must copy **every** SwiftPM resource bundle from the products
   directory into `Contents/Resources` — the library's own and one per
-  dependency (`Highlighter_Highlighter` for the syntax highlighter). A
-  dependency's `Bundle.module` fatals on first use in the assembled app when
-  its bundle is missing, and unit tests never catch it because they run from
-  `.build`, where the bundle is reachable.
-- Syntax highlighting is `SyntaxHighlighter` (protocol) over
-  `HighlighterSwift` — note the module/product name is `Highlighter`, not the
-  repository name — owned by a background actor (`HighlightrHighlighter`
-  style: one engine per actor, theme loads serialized). `CodeTextFactory.
+  dependency that bundles resources. A dependency's `Bundle.module` fatals on
+  first use in the assembled app when its bundle is missing, and unit tests
+  never catch it because they run from `.build`, where the bundle is reachable.
+- Syntax highlighting is dependency-free: `SyntaxScanner` walks the text once
+  as Unicode scalars and emits `TokenKind` runs, driven by the `Dialect` table
+  in `LanguageRules` (comment markers, string forms, keyword sets, `$`/`@`
+  variable prefixes, `#` directives) with dedicated passes for markup,
+  stylesheets, Markdown, JSON, YAML, INI/TOML and diffs. Every language name
+  `SyntaxLanguageMapper` can produce must have an entry there — the test
+  suite enforces it — because a missing one silently renders plain text. The
+  scanner only sets colors plus bold/italic trait marker fonts; `CodeTextFactory.
   styled` must re-pin font and paragraph style over any highlighter output
   (colors may be themed, metrics may not — the ruler contract above).
-  Finished results cache per document version + theme + editor font in
-  `HighlightCache`; every editor theme renders on its own background color
-  (parsed from the theme CSS), and `SettingsStore` keeps one theme per
-  interface appearance (`lightTheme` / `darkTheme`, resolved by
-  `resolvedHighlightTheme(for:)`). `DocumentStore.reloadIfChanged`
-  (mtime + size) is what keeps watcher bursts from invalidating that cache,
-  so do not replace plain `reload()` with it on the watcher path.
+  `EditorTheme` carries a palette per theme (colors lifted from the matching
+  highlight.js CSS; raw values are persisted UserDefaults keys, never rename
+  them) and every theme renders on its own background color;
+  `SettingsStore` keeps one theme per interface appearance (`lightTheme` /
+  `darkTheme`, resolved by `resolvedHighlightTheme(for:)`). `HighlightService`
+  dedupes identical in-flight requests and runs the scan on a detached task
+  that is deliberately not cancelled with its caller, so a half-styled result
+  never reaches `HighlightCache` (keyed by document version + theme + editor
+  font). `DocumentStore.reloadIfChanged` (mtime + size) is what keeps watcher
+  bursts from invalidating that cache, so do not replace plain `reload()`
+  with it on the watcher path.
 - `git log --pretty=format:` interleaves a bare newline **between** records
   (separator semantics, unlike `tformat:`), so every parsed commit record
   after the first starts with `\n`; strip it or the hash is polluted and

@@ -362,7 +362,7 @@ private struct FileDiffSection: View {
 
     private var highlightTaskID: String {
         let theme = settings.resolvedHighlightTheme(for: colorScheme)
-        return "\(document.commit.hash)#\(file.id)#\(theme.name)#\(settings.editorFont.id)#\(isExpanded)"
+        return "\(document.commit.hash)#\(file.id)#\(theme.rawValue)#\(settings.editorFont.id)#\(isExpanded)"
     }
 
     /// Highlights the file's lines in one pass and slices the result back
@@ -380,31 +380,23 @@ private struct FileDiffSection: View {
             return
         }
 
-        do {
-            let raw = try await HighlightService.shared.highlight(
-                requestKey: cacheKey,
-                text: joinedRenderableText,
-                language: language,
-                theme: theme
-            )
-            guard !Task.isCancelled, isExpanded else { return }
-            guard let lines = Self.attributedLines(raw.attributed, expectedCount: renderableCount, font: font.nsFont) else {
-                return  // line mapping broke; keep the plain rows
-            }
-            document.highlightCache.store(
-                HighlightCache.Entry(attributed: raw.attributed, background: nil),
-                for: cacheKey,
-                theme: theme,
-                fontID: font.id
-            )
-            highlightedLines = lines
-        } catch is CancellationError {
-        } catch HighlightError.unsupportedLanguage {
-            // No engine support for this language: plain text is the fallback,
-            // already painted.
-        } catch {
-            Log.editor.error("Diff highlighting \(file.newPath) failed: \(error.localizedDescription)")
+        let raw = await HighlightService.shared.highlight(
+            requestKey: cacheKey,
+            text: joinedRenderableText,
+            language: language,
+            theme: theme
+        )
+        guard !Task.isCancelled, isExpanded else { return }
+        guard let lines = Self.attributedLines(raw.attributed, expectedCount: renderableCount, font: font.nsFont) else {
+            return  // line mapping broke; keep the plain rows
         }
+        document.highlightCache.store(
+            HighlightCache.Entry(attributed: raw.attributed, background: raw.background),
+            for: cacheKey,
+            theme: theme,
+            fontID: font.id
+        )
+        highlightedLines = lines
     }
 
     /// Slices highlighted text into per-line `AttributedString`s. The theme

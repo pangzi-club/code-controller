@@ -128,8 +128,8 @@ struct SettingsStoreTests {
 
     @Test("every editor theme round-trips through its raw value")
     func editorThemeRawValueRoundTrip() {
-        for option in EditorThemeOption.allCases {
-            #expect(EditorThemeOption(rawValue: option.rawValue) == option)
+        for option in EditorTheme.allCases {
+            #expect(EditorTheme(rawValue: option.rawValue) == option)
         }
     }
 
@@ -139,13 +139,13 @@ struct SettingsStoreTests {
         defer { cleanUp() }
 
         let store = SettingsStore()
-        #expect(store.resolvedHighlightTheme(for: .light) == HighlightTheme.light)
-        #expect(store.resolvedHighlightTheme(for: .dark) == HighlightTheme.dark)
+        #expect(store.resolvedHighlightTheme(for: .light) == EditorTheme.light)
+        #expect(store.resolvedHighlightTheme(for: .dark) == EditorTheme.dark)
 
         store.lightTheme = .solarizedLight
         store.darkTheme = .nord
-        #expect(store.resolvedHighlightTheme(for: .light) == HighlightTheme(name: "solarized-light"))
-        #expect(store.resolvedHighlightTheme(for: .dark) == HighlightTheme(name: "nord"))
+        #expect(store.resolvedHighlightTheme(for: .light) == .solarizedLight)
+        #expect(store.resolvedHighlightTheme(for: .dark) == .nord)
     }
 
     @Test("editor font settings resolve into an EditorFont with a clamped size")

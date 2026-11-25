@@ -222,8 +222,8 @@ for ARCH in "${ARCH_LIST[@]}"; do
 
     # Bundle.module resolves resource bundles from the executable's
     # Contents/Resources. Every SwiftPM target with resources gets one — the
-    # app's own and one per dependency (e.g. Highlighter_Highlighter) — copy
-    # them all or a dependency's Bundle.module fatals on first use.
+    # app's own and one per dependency that bundles resources — copy them all
+    # or a dependency's Bundle.module fatals on first use.
     shopt -s nullglob
     RESOURCE_BUNDLES=("$BIN_DIR/"*.bundle)
     shopt -u nullglob

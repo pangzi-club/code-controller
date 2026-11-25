@@ -16,9 +16,8 @@ CodeCtrl is at version 0.1 and under active development.
 ## Requirements
 
 - macOS 14 Sonoma or later.
-- Xcode 15 or later (Swift 5.9 toolchain) to build. SwiftPM fetches the single
-  third-party dependency, [HighlighterSwift](https://github.com/smittytone/HighlighterSwift),
-  on the first build.
+- Xcode 15 or later (Swift 5.9 toolchain) to build. There are no third-party
+  dependencies to fetch.
 - `git` on `PATH` for the git features. It is optional — without it CodeCtrl
   works as a plain viewer and shows no badges.
 - `python3` (part of Xcode's Command Line Tools) is needed only by
@@ -30,7 +29,7 @@ CodeCtrl is at version 0.1 and under active development.
 - **File tree**: lazily loaded recursive tree (directories first, then by name) with hover highlighting, context menus (Open, Show in Finder) and per-row git status badges.
 - **Quick open (⌘P)**: a floating search panel over the workspace. It rescans on every open, matches file names case-insensitively (falling back to relative-path matches), highlights the hit in the name, and navigates with ↑/↓ + Enter; Esc or a click outside dismisses it.
 - **Document tabs**: one tab per file with middle-truncating titles, two-row wrapping, a close button and the same git status badge; the context menu closes the other tabs or everything to the left/right. ⌘W closes the selected tab (does nothing with no tabs open, so it never takes the window down); ⌘1…⌘9 switch tabs. Views are pooled in an LRU (8 entries) so switching tabs preserves scroll position and selection. Image files (PNG, JPEG, GIF, WebP, HEIC, HEIF, TIFF, BMP, AVIF, SVG) open as scaled-to-fit previews — animated formats play, oversized files still hit the shared size limit, and corrupted ones fall back to the binary-file notice. A commit's merged diff opens as its own tab kind with a git-flavored icon.
-- **Syntax highlighting**: highlight.js (via HighlighterSwift) running on a background actor, with a `SyntaxHighlighter` protocol seam for future engines. Finished results cache per document version, theme and editor font (LRU, 12 entries); the styled output is re-pinned to the editor font and pinned line height so the line-number ruler never shifts; separate editor themes for light and dark appearance (13 curated highlight.js themes, each rendered on its own background).
+- **Syntax highlighting**: a built-in Swift scanner — no JavaScript engine — covering 60+ file types (keywords, types, calls, strings, numbers, comments, plus dedicated passes for Markdown, JSON, YAML, TOML/INI, XML/HTML, CSS and diffs), running on a background task behind a `SyntaxHighlighter` protocol seam. Finished results cache per document version, theme and editor font (LRU, 12 entries); the styled output is re-pinned to the editor font and pinned line height so the line-number ruler never shifts; separate editor themes for light and dark appearance (13 built-in palettes matching the highlight.js themes of the same names, each rendered on its own background).
 - **Git integration**: repository detection at the workspace root with graceful degradation when git is missing; `git status` badges (M/A/D/?) on tree rows and tabs (⌘R refreshes tree, statuses, commits and the selected document). Only read-only git commands are used (`status`, `diff`, `log`, `show`).
 - **Changed lines in the editor**: a file that differs from HEAD opens with its working-tree changes drawn in, diff-style — green rows for lines the diff only adds, yellow rows for lines that replace removed content, a red seam marker in the line-number gutter where a block was removed outright, and solid green/yellow bars next to the numbers of changed lines. Marks follow the working tree (`git diff HEAD`, so staged and unstaged edits both count), refresh on watcher events and disappear when the file is reverted or clean.
 - **Commit history**: a Graph pane in the sidebar listing recent commits — subject, author, relative date, branch badge — click one to open its merged diff as a tab: every changed file stacked top to bottom, each rendered as an inline diff with old/new line-number gutters, green/red row tints, static "N hidden lines" bands and per-language syntax highlighting.
@@ -245,8 +244,10 @@ Sources/
 │   ├── LineNumberRulerView.swift # Line-number gutter derived from the scroll offset
 │   ├── ImageContentView.swift    # Scaled-to-fit image preview
 │   ├── LineChangeMap.swift       # Working-tree line marks + editor tints and ruler colors
-│   ├── SyntaxHighlighting.swift  # SyntaxHighlighter protocol, HighlighterSwift adapter, cache
+│   ├── SyntaxHighlighting.swift  # SyntaxHighlighter protocol, native highlighter, request dedupe, cache
+│   ├── SyntaxScanner.swift       # Dialect table + single-pass scanner for code, markup and data formats
 │   ├── EditorFont.swift          # Editor font setting: family + size, metrics and mono-family list
+│   ├── EditorTheme.swift         # Editor themes: token kinds, 13 palettes, backgrounds
 │   ├── GitService.swift          # git CLI: status/diff/log/show + observable status store
 │   ├── GitGraphView.swift        # Commit history pane
 │   ├── GitDiffDocument.swift     # Commit diff document (load state + highlight cache)
@@ -282,7 +283,9 @@ AGENTS.md                         # Conventions and gotchas for humans and agent
 
 ## Third-Party Licenses
 
-- [HighlighterSwift](https://github.com/smittytone/HighlighterSwift) — MIT License — the syntax highlighting engine; it bundles [highlight.js](https://highlightjs.org) (BSD-3-Clause).
+No third-party code is bundled. The built-in color palettes in `EditorTheme.swift`
+are taken from the [highlight.js](https://highlightjs.org) themes of the same
+names (BSD-3-Clause); only color values, no code.
 
 ## License
 

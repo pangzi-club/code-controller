@@ -1,64 +1,50 @@
+import AppKit
 import Foundation
-import Highlighter
-import SwiftUI
 
-/// Which highlight.js color set to render with: a bundled HighlighterSwift
-/// theme by name — names must match a `.css` file in the dependency bundle.
-/// The editor resolves one per interface appearance (see `SettingsStore`).
-public struct HighlightTheme: Equatable, Sendable {
-    public let name: String
-
-    public init(name: String) {
-        self.name = name
-    }
-
-    public static let light = HighlightTheme(name: "xcode")
-    public static let dark = HighlightTheme(name: "xcode-dusk")
-}
-
-public enum HighlightError: Error, LocalizedError {
-    case engineUnavailable
-    case unsupportedLanguage(String)
-    case renderFailed(String)
-
-    public var errorDescription: String? {
-        switch self {
-        case .engineUnavailable:
-            return "The highlighting engine could not be loaded."
-        case .unsupportedLanguage(let language):
-            return "Language is not supported: \(language)"
-        case .renderFailed(let language):
-            return "Highlighting failed for \(language)."
-        }
-    }
-}
-
-/// Immutable highlighted output crossing actor boundaries. `NSAttributedString`
+/// Immutable highlighted output crossing task boundaries. `NSAttributedString`
 /// has no Sendable conformance on macOS, but these instances are fully built
-/// by the highlighter actor before handoff and never mutated afterwards.
+/// by the scanner before handoff and never mutated afterwards.
 public struct HighlightedText: @unchecked Sendable {
     public let attributed: NSAttributedString
-    /// Background color parsed from the theme's `.hljs` CSS rule, if any.
-    public let background: NSColor?
+    /// Background the theme renders on.
+    public let background: NSColor
 
-    public init(attributed: NSAttributedString, background: NSColor? = nil) {
+    public init(attributed: NSAttributedString, background: NSColor) {
         self.attributed = attributed
         self.background = background
     }
 }
 
 /// Renders source text as an attributed string. Implementations must keep the
-/// characters identical and attach style attributes only (colors, fonts);
-/// `CodeTextFactory` re-applies the pinned font and line height afterwards so
-/// the line-number ruler never shifts. Backed by HighlighterSwift today, with
-/// the door left open for a tree-sitter implementation.
+/// characters identical and attach style attributes only (colors, font
+/// traits); `CodeTextFactory` re-applies the pinned font and line height
+/// afterwards so the line-number ruler never shifts.
 public protocol SyntaxHighlighter: Sendable {
-    func highlight(_ text: String, language: String, theme: HighlightTheme) async throws -> HighlightedText
+    func highlight(_ text: String, language: String, theme: EditorTheme) -> HighlightedText
 }
 
-/// Maps file extensions to canonical highlight.js language names. The adapter
-/// validates against `supportedLanguages()`, so optimistic names here only
-/// cost a failed lookup for exotic extensions, never a broken render.
+/// The built-in highlighter: `SyntaxScanner` plus the theme palette. Pure
+/// Swift with no engine to load or theme to parse, so it cannot fail — an
+/// unknown language simply comes back in the plain color.
+public struct NativeHighlighter: SyntaxHighlighter {
+    public init() {}
+
+    public func highlight(_ text: String, language: String, theme: EditorTheme) -> HighlightedText {
+        HighlightedText(
+            attributed: SyntaxScanner.attributedString(for: text, language: language, theme: theme),
+            background: theme.background
+        )
+    }
+
+    /// Whether the scanner has rules for the language.
+    public static func supports(_ language: String) -> Bool {
+        LanguageRules.mode(for: language) != nil
+    }
+}
+
+/// Maps file extensions to canonical language names (see `LanguageRules`).
+/// Every name here has scanner rules, so a mapped extension always renders
+/// highlighted.
 public enum SyntaxLanguageMapper {
     private static let languagesByExtension: [String: String] = [
         "swift": "swift",
@@ -149,82 +135,48 @@ public enum SyntaxLanguageMapper {
     public static func highlightLanguage(forExtension extensionName: String) -> String? {
         languagesByExtension[extensionName.lowercased()]
     }
-}
 
-/// `SyntaxHighlighter` backed by HighlighterSwift (highlight.js on
-/// JavaScriptCore). The wrapped `Highlighter` is not thread-safe, so the
-/// instance lives on this actor and theme loads serialize with highlight
-/// runs — all CPU-heavy work stays off the main thread.
-public actor HighlighterSwiftHighlighter: SyntaxHighlighter {
-    public static let shared = HighlighterSwiftHighlighter()
-
-    private var highlighter: Highlighter?
-    private var loadedTheme: HighlightTheme?
-
-    public init() {}
-
-    public func highlight(_ text: String, language: String, theme: HighlightTheme) async throws -> HighlightedText {
-        let engine = try self.engine()
-        if loadedTheme != theme {
-            guard engine.setTheme(theme.name) else {
-                throw HighlightError.renderFailed(theme.name)
-            }
-            loadedTheme = theme
-        }
-        guard engine.supportedLanguages().contains(language) else {
-            throw HighlightError.unsupportedLanguage(language)
-        }
-        guard let result = engine.highlight(text, as: language, doFastRender: true) else {
-            throw HighlightError.renderFailed(language)
-        }
-        return HighlightedText(
-            attributed: result,
-            background: engine.theme?.themeBackgroundColour
-        )
-    }
-
-    private func engine() throws -> Highlighter {
-        if let highlighter { return highlighter }
-        guard let created = Highlighter() else { throw HighlightError.engineUnavailable }
-        created.ignoreIllegals = true
-        highlighter = created
-        loadedTheme = nil
-        return created
-    }
+    /// Every language name any extension can produce.
+    static var languages: Set<String> { Set(languagesByExtension.values) }
 }
 
 /// Collapses concurrent identical highlight requests into one running task
-/// and gives the coordinator a seam to inject a stub highlighter in previews.
+/// and gives the coordinator a seam to inject a stub highlighter in previews
+/// and tests. Scanning runs on a detached task so the main actor never pays
+/// for it.
 @MainActor
 public final class HighlightService {
     public static let shared = HighlightService()
 
     private let highlighter: any SyntaxHighlighter
-    private var inflight: [String: Task<HighlightedText, Error>] = [:]
+    private var inflight: [String: Task<HighlightedText, Never>] = [:]
 
-    public init(highlighter: any SyntaxHighlighter = HighlighterSwiftHighlighter.shared) {
+    public init(highlighter: any SyntaxHighlighter = NativeHighlighter()) {
         self.highlighter = highlighter
     }
 
     /// `requestKey` identifies the content (tab + document version + language)
     /// so callers re-requesting the same document while a run is in flight
-    /// share it instead of doubling the work on the highlighter actor.
+    /// share it instead of doubling the work.
     public func highlight(
         requestKey: String,
         text: String,
         language: String,
-        theme: HighlightTheme
-    ) async throws -> HighlightedText {
+        theme: EditorTheme
+    ) async -> HighlightedText {
         if let existing = inflight[requestKey] {
-            return try await existing.value
+            return await existing.value
         }
         let highlighter = self.highlighter
-        let task = Task { [weak self] in
-            defer { Task { @MainActor [weak self] in self?.inflight[requestKey] = nil } }
-            return try await highlighter.highlight(text, language: language, theme: theme)
+        // Deliberately not cancelled with the caller: a finished scan is
+        // cached by the pane for the next time the document is shown, and a
+        // half-styled result must never reach that cache.
+        let task = Task.detached(priority: .userInitiated) {
+            highlighter.highlight(text, language: language, theme: theme)
         }
         inflight[requestKey] = task
-        return try await task.value
+        defer { Task { @MainActor [weak self] in self?.inflight[requestKey] = nil } }
+        return await task.value
     }
 }
 
@@ -238,9 +190,9 @@ public final class HighlightCache {
     /// re-highlighting.
     public struct Entry {
         public let attributed: NSAttributedString
-        public let background: NSColor?
+        public let background: NSColor
 
-        public init(attributed: NSAttributedString, background: NSColor?) {
+        public init(attributed: NSAttributedString, background: NSColor) {
             self.attributed = attributed
             self.background = background
         }
@@ -259,7 +211,7 @@ public final class HighlightCache {
         self.capacity = capacity
     }
 
-    public func result(for key: String, theme: HighlightTheme, fontID: String) -> Entry? {
+    public func result(for key: String, theme: EditorTheme, fontID: String) -> Entry? {
         let key = Self.cacheKey(key, theme: theme, fontID: fontID)
         guard var slot = slots[key] else { return nil }
         clock += 1
@@ -268,7 +220,7 @@ public final class HighlightCache {
         return slot.entry
     }
 
-    public func store(_ entry: Entry, for key: String, theme: HighlightTheme, fontID: String) {
+    public func store(_ entry: Entry, for key: String, theme: EditorTheme, fontID: String) {
         let key = Self.cacheKey(key, theme: theme, fontID: fontID)
         guard slots[key] == nil else { return }
         clock += 1
@@ -276,8 +228,8 @@ public final class HighlightCache {
         evictIfNeeded()
     }
 
-    private static func cacheKey(_ key: String, theme: HighlightTheme, fontID: String) -> String {
-        "\(key)#\(theme.name)#\(fontID)"
+    private static func cacheKey(_ key: String, theme: EditorTheme, fontID: String) -> String {
+        "\(key)#\(theme.rawValue)#\(fontID)"
     }
 
     private func evictIfNeeded() {

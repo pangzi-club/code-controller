@@ -167,15 +167,15 @@ private struct EditorPane: View {
         Double(EditorFont.sizeRange.lowerBound)...Double(EditorFont.sizeRange.upperBound)
     }
 
-    /// One bundled theme per interface appearance, with a live preview below
-    /// showing whichever the current appearance resolves to.
+    /// One built-in palette per interface appearance, with a live preview
+    /// below showing whichever the current appearance resolves to.
     private func themePickerRow(
         _ labelKey: String,
-        selection: Binding<EditorThemeOption>
+        selection: Binding<EditorTheme>
     ) -> some View {
         SettingsRow(labelKey) {
             Picker(selection: selection) {
-                ForEach(EditorThemeOption.allCases, id: \.self) { option in
+                ForEach(EditorTheme.allCases, id: \.self) { option in
                     l10n(option.labelKey).tag(option)
                 }
             } label: {

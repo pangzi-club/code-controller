@@ -12,17 +12,9 @@ let package = Package(
         // the executable below is a thin @main wrapper.
         .library(name: "CodeViewer", targets: ["CodeViewer"]),
     ],
-    dependencies: [
-        // Syntax highlighting (highlight.js). Hidden behind the
-        // `SyntaxHighlighter` protocol so it can be replaced by tree-sitter.
-        .package(url: "https://github.com/smittytone/HighlighterSwift", from: "3.1.0"),
-    ],
     targets: [
         .target(
             name: "CodeViewer",
-            dependencies: [
-                .product(name: "Highlighter", package: "HighlighterSwift"),
-            ],
             path: "Sources/CodeViewer",
             resources: [
                 .process("Resources")

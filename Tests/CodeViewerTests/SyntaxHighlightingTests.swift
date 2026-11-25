@@ -3,7 +3,7 @@ import Testing
 @testable import CodeViewer
 
 struct SyntaxLanguageMapperTests {
-    @Test("known extensions map to canonical highlight.js names")
+    @Test("known extensions map to canonical language names")
     func mapsKnownExtensions() {
         #expect(SyntaxLanguageMapper.highlightLanguage(forExtension: "swift") == "swift")
         #expect(SyntaxLanguageMapper.highlightLanguage(forExtension: "json") == "json")
@@ -25,6 +25,14 @@ struct SyntaxLanguageMapperTests {
         #expect(SyntaxLanguageMapper.highlightLanguage(forExtension: "xyzzy") == nil)
         #expect(SyntaxLanguageMapper.highlightLanguage(forExtension: "") == nil)
     }
+
+    @Test("every mapped language has scanner rules")
+    func mappedLanguagesHaveRules() {
+        #expect(!SyntaxLanguageMapper.languages.isEmpty)
+        for language in SyntaxLanguageMapper.languages {
+            #expect(NativeHighlighter.supports(language), "no scanner rules for \(language)")
+        }
+    }
 }
 
 @MainActor
@@ -32,8 +40,7 @@ struct HighlightCacheTests {
     @Test("round-trips a stored result and isolates themes")
     func roundTripsAndIsolatesThemes() {
         let cache = HighlightCache()
-        let light = HighlightCache.Entry(attributed: NSAttributedString(string: "light"), background: nil)
-        let dark = HighlightCache.Entry(attributed: NSAttributedString(string: "dark"), background: nil)
+        let light = HighlightCache.Entry(attributed: NSAttributedString(string: "light"), background: EditorTheme.light.background)
         let fontID = EditorFont.default.id
 
         #expect(cache.result(for: "doc#1", theme: .light, fontID: fontID) == nil)
@@ -47,7 +54,7 @@ struct HighlightCacheTests {
     func isolatesFonts() {
         let cache = HighlightCache()
         cache.store(
-            HighlightCache.Entry(attributed: NSAttributedString(string: "a"), background: nil),
+            HighlightCache.Entry(attributed: NSAttributedString(string: "a"), background: EditorTheme.light.background),
             for: "doc#1",
             theme: .light,
             fontID: "system#13.0"
@@ -61,19 +68,20 @@ struct HighlightCacheTests {
     func evictsLeastRecentlyUsed() {
         let cache = HighlightCache(capacity: 2)
         let fontID = EditorFont.default.id
+        let background = EditorTheme.light.background
         cache.store(
-            HighlightCache.Entry(attributed: NSAttributedString(string: "a"), background: nil),
+            HighlightCache.Entry(attributed: NSAttributedString(string: "a"), background: background),
             for: "a", theme: .light, fontID: fontID
         )
         cache.store(
-            HighlightCache.Entry(attributed: NSAttributedString(string: "b"), background: nil),
+            HighlightCache.Entry(attributed: NSAttributedString(string: "b"), background: background),
             for: "b", theme: .light, fontID: fontID
         )
 
         // Touching "a" makes "b" the least recently used.
         _ = cache.result(for: "a", theme: .light, fontID: fontID)
         cache.store(
-            HighlightCache.Entry(attributed: NSAttributedString(string: "c"), background: nil),
+            HighlightCache.Entry(attributed: NSAttributedString(string: "c"), background: background),
             for: "c", theme: .light, fontID: fontID
         )
 
@@ -139,18 +147,60 @@ struct CodeTextFactoryStylingTests {
         #expect(font.pointSize == 15)
         #expect(font.familyName == "Menlo")
     }
+
+    @Test("markdown emphasis traits survive the font swap")
+    func preservesEmphasisTraits() {
+        let input = NSMutableAttributedString(string: "**bold** and *em*")
+        input.addAttribute(.font, value: SyntaxScanner.boldMarker, range: NSRange(location: 0, length: 8))
+        input.addAttribute(.font, value: SyntaxScanner.italicMarker, range: NSRange(location: 13, length: 4))
+
+        let styled = CodeTextFactory.styled(input, font: .default)
+        let bold = styled.attribute(.font, at: 1, effectiveRange: nil) as? NSFont
+        let italic = styled.attribute(.font, at: 14, effectiveRange: nil) as? NSFont
+        #expect(bold?.fontDescriptor.symbolicTraits.contains(.bold) == true)
+        #expect(italic?.fontDescriptor.symbolicTraits.contains(.italic) == true)
+    }
 }
 
-@Suite(.serialized)
-struct HighlighterSwiftHighlighterTests {
-    let highlighter = HighlighterSwiftHighlighter()
+struct EditorThemeTests {
+    @Test("every theme covers every token kind")
+    func palettesAreComplete() {
+        for theme in EditorTheme.allCases {
+            #expect(theme.coversAllTokens, "\(theme.rawValue) is missing token colors")
+        }
+    }
+
+    @Test("dark themes have dark backgrounds and light themes light ones")
+    func backgroundMatchesAppearance() {
+        for theme in EditorTheme.allCases {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            theme.background.usingColorSpace(.sRGB)?.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            let luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+            #expect((luminance < 0.5) == theme.isDark, "\(theme.rawValue) background \(luminance)")
+        }
+    }
+
+    @Test("theme raw values round-trip and the stock pair matches the defaults")
+    func rawValuesRoundTrip() {
+        for theme in EditorTheme.allCases {
+            #expect(EditorTheme(rawValue: theme.rawValue) == theme)
+        }
+        #expect(EditorTheme.light == .xcode)
+        #expect(EditorTheme.dark == .xcodeDusk)
+        #expect(EditorTheme.xcodeDusk.rawValue == "xcode-dusk")
+    }
+}
+
+struct NativeHighlighterTests {
+    let highlighter = NativeHighlighter()
 
     @Test("highlighting preserves characters and adds theme colors")
-    func highlightsSwiftPreservingCharacters() async throws {
+    func highlightsSwiftPreservingCharacters() {
         let source = "struct Hello {\n    let message = \"hi\"\n}\n"
-        let result = try await highlighter.highlight(source, language: "swift", theme: .light)
+        let result = highlighter.highlight(source, language: "swift", theme: .light)
 
         #expect(result.attributed.string == source)
+        #expect(result.background == EditorTheme.light.background)
 
         var colors = Set<ObjectIdentifier>()
         result.attributed.enumerateAttribute(
@@ -164,28 +214,17 @@ struct HighlighterSwiftHighlighterTests {
         #expect(colors.count > 1)
     }
 
-    @Test("an unsupported language throws instead of rendering")
-    func unsupportedLanguageThrows() async {
-        await #expect(throws: HighlightError.self) {
-            try await highlighter.highlight("x", language: "definitely-not-a-language", theme: .light)
-        }
+    @Test("an unsupported language renders plain text in the theme's colors")
+    func unsupportedLanguageIsPlain() {
+        let result = highlighter.highlight("x = 1", language: "definitely-not-a-language", theme: .dark)
+
+        #expect(result.attributed.string == "x = 1")
+        #expect(result.attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor == EditorTheme.dark.color(for: .plain))
+        #expect(result.background == EditorTheme.dark.background)
     }
 
-    @Test("a user-picked theme reports its own background color")
-    func pickedThemeReportsBackground() async throws {
-        let source = "let x = 1\n"
-        let result = try await highlighter.highlight(
-            source,
-            language: "swift",
-            theme: HighlightTheme(name: "dracula")
-        )
-
-        #expect(result.attributed.string == source)
-        #expect(result.background != nil)
-    }
-
-    @Test("a 1500-line Swift file highlights without trouble")
-    func longFileStaysFast() async throws {
+    @Test("a 1500-line Swift file highlights quickly")
+    func longFileStaysFast() {
         var lines: [String] = []
         lines.reserveCapacity(1500)
         for index in 0..<375 {
@@ -198,49 +237,58 @@ struct HighlighterSwiftHighlighterTests {
         #expect(lines.count == 1500)
 
         let start = ContinuousClock.now
-        let result = try await highlighter.highlight(source, language: "swift", theme: .dark)
+        let result = highlighter.highlight(source, language: "swift", theme: .dark)
         let elapsed = start.duration(to: .now)
 
         #expect(result.attributed.string == source)
-        // Generous margin for CI machines; locally this lands well under 1s.
-        #expect(elapsed < .seconds(10))
+        // Generous margin for CI machines; locally this lands in a few ms.
+        #expect(elapsed < .seconds(2))
     }
 }
 
 @MainActor
 struct HighlightServiceTests {
-    private actor CountingHighlighter: SyntaxHighlighter {
-        private(set) var callCount = 0
+    private final class CountingHighlighter: SyntaxHighlighter, @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
 
-        func highlight(_ text: String, language: String, theme: HighlightTheme) async throws -> HighlightedText {
-            callCount += 1
-            try await Task.sleep(for: .milliseconds(150))
-            return HighlightedText(attributed: NSAttributedString(string: text))
+        var callCount: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return count
+        }
+
+        func highlight(_ text: String, language: String, theme: EditorTheme) -> HighlightedText {
+            lock.lock()
+            count += 1
+            lock.unlock()
+            Thread.sleep(forTimeInterval: 0.05)
+            return HighlightedText(attributed: NSAttributedString(string: text), background: theme.background)
         }
     }
 
     @Test("concurrent identical requests share one highlight run")
-    func concurrentIdenticalRequestsShareOneRun() async throws {
+    func concurrentIdenticalRequestsShareOneRun() async {
         let stub = CountingHighlighter()
         let service = HighlightService(highlighter: stub)
 
         async let first = service.highlight(requestKey: "k", text: "abc", language: "swift", theme: .light)
         async let second = service.highlight(requestKey: "k", text: "abc", language: "swift", theme: .light)
-        let (a, b) = try await (first, second)
+        let (a, b) = await (first, second)
 
         #expect(a.attributed.string == "abc")
         #expect(b.attributed.string == "abc")
-        #expect(await stub.callCount == 1)
+        #expect(stub.callCount == 1)
     }
 
     @Test("different request keys run separately")
-    func differentKeysRunSeparately() async throws {
+    func differentKeysRunSeparately() async {
         let stub = CountingHighlighter()
         let service = HighlightService(highlighter: stub)
 
-        _ = try await service.highlight(requestKey: "k1", text: "abc", language: "swift", theme: .light)
-        _ = try await service.highlight(requestKey: "k2", text: "abc", language: "swift", theme: .light)
+        _ = await service.highlight(requestKey: "k1", text: "abc", language: "swift", theme: .light)
+        _ = await service.highlight(requestKey: "k2", text: "abc", language: "swift", theme: .light)
 
-        #expect(await stub.callCount == 2)
+        #expect(stub.callCount == 2)
     }
 }

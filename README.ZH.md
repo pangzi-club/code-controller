@@ -11,7 +11,7 @@ CodeCtrl 目前是 0.1 版本，仍在积极开发中。
 ## 系统要求
 
 - macOS 14 Sonoma 或更高版本。
-- Xcode 15 或更高版本（Swift 5.9 工具链）用于构建。SwiftPM 会在首次构建时拉取唯一的第三方依赖 [HighlighterSwift](https://github.com/smittytone/HighlighterSwift)。
+- Xcode 15 或更高版本（Swift 5.9 工具链）用于构建。没有需要拉取的第三方依赖。
 - `PATH` 中有 `git` 才能使用 git 相关功能。它是可选的 —— 没有 git 时 CodeCtrl 就是一个普通的查看器，不显示徽章。
 - `python3`（Xcode 命令行工具自带）只有 `Scripts/make-app.sh` 组装 `.app` 时才需要。
 
@@ -21,7 +21,7 @@ CodeCtrl 目前是 0.1 版本，仍在积极开发中。
 - **文件树**：懒加载的递归目录树（文件夹在前，再按名称排序），悬停高亮，右键菜单（打开、在 Finder 中显示），每行带 Git 状态徽章。
 - **快速打开（⌘P）**：工作区上方的浮动搜索面板。每次打开重新扫描，文件名大小写不敏感匹配（无命中时回退到相对路径匹配），命中部分在文件名中高亮，↑/↓ + Enter 键盘导航，Esc 或点击面板外关闭。
 - **文档标签页**：每个文件一个标签，标题中间截断、两行折行、可关闭，并带同样的 Git 状态徽章；右键菜单可以关闭其他标签或左侧 / 右侧的全部标签。⌘W 关闭当前标签（无标签时不会关掉窗口）；⌘1…⌘9 切换标签。编辑器视图以 LRU 池复用（8 个），切换标签保留滚动位置和选区。图片文件（PNG、JPEG、GIF、WebP、HEIC、HEIF、TIFF、BMP、AVIF、SVG）打开为按比例适配的预览——动图照常播放，超大文件仍受统一大小上限约束，损坏文件回落到二进制提示。提交的合并 diff 以独立标签类型打开，配 Git 专属图标。
-- **语法高亮**：highlight.js（经 HighlighterSwift）在后台 actor 上运行，通过 `SyntaxHighlighter` 协议抽象、便于日后替换引擎。高亮结果按文档版本、主题和编辑器字体缓存（LRU，12 条）；输出会重新套用编辑器字体和固定行高，行号尺不错位；浅色 / 深色外观各配一个编辑器主题（13 个精选 highlight.js 主题，均使用主题自身背景色渲染）。
+- **语法高亮**：内置的纯 Swift 扫描器（不依赖 JavaScript 引擎），覆盖 60 多种文件类型（关键字、类型、调用、字符串、数字、注释，并为 Markdown、JSON、YAML、TOML/INI、XML/HTML、CSS 和 diff 提供专用扫描），在后台任务中运行，通过 `SyntaxHighlighter` 协议抽象、便于日后替换引擎。高亮结果按文档版本、主题和编辑器字体缓存（LRU，12 条）；输出会重新套用编辑器字体和固定行高，行号尺不错位；浅色 / 深色外观各配一个编辑器主题（13 套内置调色板，与同名 highlight.js 主题配色一致，均使用主题自身背景色渲染）。
 - **Git 集成**：在工作区根目录探测仓库，未装 git 或非仓库时优雅降级；`git status` 的 M/A/D/? 徽章显示在文件树和标签上（⌘R 刷新文件树、状态、提交列表和当前文档）。只使用只读的 git 命令（`status`、`diff`、`log`、`show`）。
 - **编辑器内显示改动行**：与 HEAD 有差异的文件打开后，工作区改动会像 diff 一样标出来——只新增的行是绿色底，替换了被删内容的行是黄色底，整块被删除的位置在行号栏留一个红色缺口标记，改动行号右侧还有实心的绿 / 黄竖条。标记取自工作区（`git diff HEAD`，暂存和未暂存的改动都算），文件变化时刷新，文件恢复干净后自动消失。
 - **提交历史**：侧边栏「提交」面板列出最近提交——信息、作者、相对时间、分支徽章——点击任意提交在标签页中打开合并 diff：该提交的所有文件自上而下堆叠，每个文件渲染为 inline diff（新旧双行号列、整行绿/红底色、静态「N 行已隐藏」折叠带、按语言语法高亮）。
@@ -156,8 +156,10 @@ Sources/
 │   ├── LineNumberRulerView.swift # 由滚动偏移推导的行号栏
 │   ├── ImageContentView.swift    # 按比例适配的图片预览
 │   ├── LineChangeMap.swift       # 工作区改动行标记 + 编辑器底色和行号栏颜色
-│   ├── SyntaxHighlighting.swift  # SyntaxHighlighter 协议、HighlighterSwift 适配、缓存
+│   ├── SyntaxHighlighting.swift  # SyntaxHighlighter 协议、原生高亮器、请求去重、缓存
+│   ├── SyntaxScanner.swift       # 语言方言表 + 单遍扫描器（代码、标记语言、数据格式）
 │   ├── EditorFont.swift          # 编辑器字体设置：字体族 + 字号、行高度量与等宽字体族列表
+│   ├── EditorTheme.swift         # 编辑器主题：token 种类、13 套调色板、背景色
 │   ├── GitService.swift          # git CLI：status/diff/log/show + 可观察状态 store
 │   ├── GitGraphView.swift        # 提交历史面板
 │   ├── GitDiffDocument.swift     # 提交 diff 文档（加载状态 + 高亮缓存）
@@ -193,7 +195,7 @@ AGENTS.md                         # 面向人和 agent 的约定与坑位说明
 
 ## 第三方许可证
 
-- [HighlighterSwift](https://github.com/smittytone/HighlighterSwift) —— MIT 许可证 —— 语法高亮引擎；它内置了 [highlight.js](https://highlightjs.org)（BSD-3-Clause）。
+不包含任何第三方代码。`EditorTheme.swift` 中的内置调色板取自同名的 [highlight.js](https://highlightjs.org) 主题（BSD-3-Clause），仅使用颜色值，不含代码。
 
 ## 许可证
 
