@@ -90,3 +90,8 @@
 "Tabs" = "Tabs";
 "File" = "File";
 "Preferences" = "Preferences";
+
+// Markdown preview
+"Source" = "Source";
+"Show the Markdown source" = "Show the Markdown source";
+"Show the rendered preview" = "Show the rendered preview";

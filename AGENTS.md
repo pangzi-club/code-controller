@@ -236,6 +236,7 @@ instead of a developer's home path.
   for `.git` — deliberately no walk-up, so a workspace that is a subfolder of
   some enclosing repository stays badge-free instead of showing statuses
   from a repo the user never chose.
+- Markdown tabs (`.md` / `.markdown`) open rendered: `WorkspaceDetailView` keeps a per-tab mode (default preview) and, while a tab is in preview, `textSelection` returns nil so the code pane stays idle under the opaque preview instead of highlighting text nobody sees. `MarkdownContentView` owns the rendering; parsing is swift-markdown's job and `MarkdownDocument` only maps its tree onto the small tree the views use — add new shapes there, not in views. Code blocks highlight through the shared `HighlightService` into the process-wide `MarkdownHighlighting` cache keyed by document version + content hash (`hashValue` is per-process; never persist it). The Source / Preview switch is a ZStack child pinned by a full-size layout frame, which takes no hits.
 - The tab key monitor (`ContentView.installTabKeyMonitor`) matches keys by
   ANSI keycode with only ⇧⌃⌥ rejected as modifiers. Caps lock stamps
   `.alphaShift` on real key events and uppercases the event characters, so

@@ -90,3 +90,8 @@
 "Tabs" = "标签页";
 "File" = "文件";
 "Preferences" = "偏好设置";
+
+// Markdown preview
+"Source" = "源码";
+"Show the Markdown source" = "显示 Markdown 源码";
+"Show the rendered preview" = "显示渲染后的预览";

@@ -30,6 +30,7 @@ CodeCtrl 目前是 0.1 版本，仍在积极开发中。
 - **持久化**：工作区列表以 security-scoped bookmark 的形式存于 UserDefaults（App Store 沙盒构建在重启后仍可访问；失效文件夹会被过滤），窗口框架由系统在重启后恢复。
 - **本地化**：支持英文和简体中文，默认跟随系统语言，可在设置中覆盖（重启后生效）。
 - **诊断**：结构化统一日志会同步写入轮转文件日志，启动横幅会记录 bundle、沙盒和日志路径。
+- **Markdown 预览**：「BT».md` / 「BT».markdown` 文件默认以渲染后的样子打开——CommonMark + GFM（表格、删除线、任务列表）由 swift-markdown 解析、原生 SwiftUI 排版，代码块沿用编辑器字体和主题，本地图片相对文件路径解析，相对链接在标签页内打开。右下角浮动的「源码 / 预览」切换按钮按标签页切换视角；源码就是常规的高亮代码窗格。
 - 自动适配浅色 / 深色外观。
 
 ## 键盘快捷键
@@ -156,6 +157,8 @@ Sources/
 │   ├── DocumentTabBar.swift      # 可折行的标签条 + 徽章
 │   ├── DocumentStore.swift       # 每标签的文件文档：加载状态、变更后重载
 │   ├── CodePane.swift            # LRU 池化 NSTextView 编辑器 + 固定排版度量
+│   ├── MarkdownDocument.swift    # swift-markdown 的树缩减为预览渲染所需的块与行内节点
+│   ├── MarkdownContentView.swift # 渲染预览窗格 + 浮动的「源码 / 预览」切换按钮
 │   ├── LineNumberRulerView.swift # 由滚动偏移推导的行号栏
 │   ├── ImageContentView.swift    # 按比例适配的图片预览
 │   ├── LineChangeMap.swift       # 工作区改动行标记 + 编辑器底色和行号栏颜色
@@ -198,7 +201,7 @@ AGENTS.md                         # 面向人和 agent 的约定与坑位说明
 
 ## 第三方许可证
 
-不包含任何第三方代码。`EditorTheme.swift` 中的内置调色板取自同名的 [highlight.js](https://highlightjs.org) 主题（BSD-3-Clause），仅使用颜色值，不含代码。
+Markdown 由 [swift-markdown](https://github.com/swiftlang/swift-markdown)（Apache-2.0，内含 cmark-gfm）解析。`EditorTheme.swift` 中的内置调色板取自同名的 [highlight.js](https://highlightjs.org) 主题（BSD-3-Clause），仅使用颜色值，不含代码。
 
 ## 许可证
 

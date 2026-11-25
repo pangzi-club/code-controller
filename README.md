@@ -38,6 +38,7 @@ CodeCtrl is at version 0.1 and under active development.
 - **Persistence**: the workspace list is stored as security-scoped bookmarks in UserDefaults (so the sandboxed App Store build keeps access across relaunches; stale folders are dropped), and the system restores the window frame across relaunches.
 - **Localization**: English and Simplified Chinese, following the system language by default with an override in Settings (takes effect on relaunch).
 - **Diagnostics**: structured unified logging mirrored to a rotating file log, with a launch banner that records the bundle, sandbox and log paths.
+- **Markdown preview**: `.md` / `.markdown` files open rendered by default — CommonMark + GFM (tables, strikethrough, task lists) parsed by swift-markdown and laid out natively in SwiftUI, with the editor font and theme on code blocks, local images resolved against the file and relative links opened in tabs. A floating Source / Preview switch pinned to the bottom-right corner flips the view per tab; Source is the regular highlighted code pane.
 - Adapts to light and dark appearance.
 
 ## Keyboard Shortcuts
@@ -244,6 +245,8 @@ Sources/
 │   ├── DocumentTabBar.swift      # Wrapping tab strip with badges
 │   ├── DocumentStore.swift       # Per-tab file document: load state, reload-if-changed
 │   ├── CodePane.swift            # LRU-pooled NSTextView editors + pinned metrics
+│   ├── MarkdownDocument.swift    # swift-markdown tree reduced to the blocks and runs the preview renders
+│   ├── MarkdownContentView.swift # Rendered preview pane + the floating Source/Preview switch
 │   ├── LineNumberRulerView.swift # Line-number gutter derived from the scroll offset
 │   ├── ImageContentView.swift    # Scaled-to-fit image preview
 │   ├── LineChangeMap.swift       # Working-tree line marks + editor tints and ruler colors
@@ -286,7 +289,8 @@ AGENTS.md                         # Conventions and gotchas for humans and agent
 
 ## Third-Party Licenses
 
-No third-party code is bundled. The built-in color palettes in `EditorTheme.swift`
+Markdown is parsed with [swift-markdown](https://github.com/swiftlang/swift-markdown)
+(Apache-2.0), which wraps cmark-gfm. The built-in color palettes in `EditorTheme.swift`
 are taken from the [highlight.js](https://highlightjs.org) themes of the same
 names (BSD-3-Clause); only color values, no code.
 

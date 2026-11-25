@@ -208,6 +208,8 @@ private struct WorkspaceDetailView: View {
 
     @State private var isQuickOpenPresented = false
     @State private var quickOpenQuery = ""
+    /// Per-tab choice for Markdown files; tabs default to the rendered preview.
+    @State private var markdownModes: [DocumentTab.ID: MarkdownViewMode] = [:]
 
     private var title: String {
         session.selectedTab?.name ?? workspace.name
@@ -222,6 +224,16 @@ private struct WorkspaceDetailView: View {
                     .accessibilityHidden(hasOverlay)
                     .allowsHitTesting(!hasOverlay)
                 overlay
+                if let tab = markdownSwitchTab {
+                    // Pins the switch to the pane's bottom-right corner in both
+                    // modes; the layout frame itself takes no hits.
+                    MarkdownViewSwitch(mode: Binding(
+                        get: { markdownMode(for: tab) },
+                        set: { markdownModes[tab.id] = $0 }
+                    ))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(16)
+                }
                 if isQuickOpenPresented {
                     QuickOpenView(
                         root: workspace.url,
@@ -391,7 +403,9 @@ private struct WorkspaceDetailView: View {
         language: String?,
         lineChanges: LineChangeMap?
     )? {
-        guard let tab = session.selectedTab,
+        // A rendered Markdown tab keeps the code pane idle underneath rather
+        // than highlighting source nobody sees.
+        guard markdownPreview == nil, let tab = session.selectedTab,
               case .file(let url, let store) = tab.content,
               case .text(let document) = store.state,
               !document.text.isEmpty else {
@@ -404,6 +418,42 @@ private struct WorkspaceDetailView: View {
             SyntaxLanguageMapper.highlightLanguage(forExtension: url.pathExtension),
             session.git.lineChanges(for: url)
         )
+    }
+
+    private func markdownMode(for tab: DocumentTab) -> MarkdownViewMode {
+        markdownModes[tab.id] ?? .preview
+    }
+
+    /// The selected Markdown document while it is rendered.
+    private var markdownPreview: (document: TextDocument, url: URL, documentID: String)? {
+        guard let tab = session.selectedTab,
+              case .file(let url, let store) = tab.content,
+              url.isMarkdown, markdownMode(for: tab) == .preview,
+              case .text(let document) = store.state, !document.text.isEmpty else {
+            return nil
+        }
+        return (document, url, store.versionID)
+    }
+
+    /// The selected tab when the Source / Preview switch applies to it.
+    private var markdownSwitchTab: DocumentTab? {
+        guard let tab = session.selectedTab, let url = tab.url, url.isMarkdown,
+              case .file(_, let store) = tab.content,
+              case .text(let document) = store.state, !document.text.isEmpty else {
+            return nil
+        }
+        return tab
+    }
+
+    /// Relative links in a preview stay inside the app: files open in a tab,
+    /// folders in Finder. Everything else already went to the system.
+    private func openMarkdownLink(_ url: URL) {
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
+        if url.hasDirectoryPath || values?.isDirectory == true {
+            FileOpener.reveal(url)
+        } else {
+            session.open(FileNode(url: url, isDirectory: false))
+        }
     }
 
     /// True while a status/loading view covers the code pane. The pane stays
@@ -426,7 +476,7 @@ private struct WorkspaceDetailView: View {
                 // path), reusing stale @State across documents.
                 GitDiffContentView(document: document)
                     .id(document.commit.hash)
-            case .file(_, let store):
+            case .file(let url, let store):
                 switch store.state {
                 case .empty:
                     StatusView(icon: "doc.text", message: l10n("Select a file to view"))
@@ -440,6 +490,13 @@ private struct WorkspaceDetailView: View {
                 case .text(let document):
                     if document.text.isEmpty {
                         StatusView(icon: "doc", message: l10n("This file is empty"))
+                    } else if url.isMarkdown, let preview = markdownPreview {
+                        MarkdownContentView(
+                            document: preview.document,
+                            url: preview.url,
+                            documentID: preview.documentID,
+                            onOpenFile: openMarkdownLink
+                        )
                     }
                 case .image(let document):
                     ImageContentView(document: document)

@@ -71,7 +71,9 @@ enum FileIcon {
         switch url.pathExtension.lowercased() {
         case "json", "yaml", "yml", "toml", "plist", "xml", "entitlements", "xcconfig", "lock":
             return "curlybraces"
-        case "md", "markdown", "txt", "rtf", "log":
+        case "md", "markdown":
+            return "doc.richtext"
+        case "txt", "rtf", "log":
             return "doc.text"
         case "png", "jpg", "jpeg", "gif", "svg", "webp", "heic", "heif",
              "tiff", "tif", "bmp", "avif", "pdf":
